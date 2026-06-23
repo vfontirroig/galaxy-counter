@@ -1,5 +1,5 @@
 """
-Dataset class for paired Euclid (VIS) x COSMOS (F115W) images.
+Dataset class for paired Euclid (VIS) x COSMOS (F150W) images.
 
 Reads from the HDF5 file produced by build_hdf5.py. Images are already
 preprocessed (ZP-rescaled, arcsinh range-compressed for COSMOS). This class
@@ -9,20 +9,21 @@ images are ready for the model.
 HDF5 layout expected (from build_hdf5.py):
     euclid_images             — (N, 1, H_euc, W_euc) float32
     cosmos_images             — (N, 1, H_cos, W_cos) float32
-    cosmos_images_downscaled  — (N, 1, H_euc, W_euc) float32
+    cosmos_images_downscaled  — (N, 1, H_SIZE, W_SIZE) float32
+    euclid_images_upscaled    — (N, 1, H_SIZE, W_SIZE) float32
     catalog/euclid_paths      — string array (N,)
     catalog/cosmos_paths      — string array (N,)
     attrs: num_pairs, euclid_shape, cosmos_shape
 
 Usage:
     from dataset import EuclidCosmosDataset, collate_pairs
-    dataset = EuclidCosmosDataset(hdf5_path="euclid_cosmos_pairs.h5")
+    dataset = EuclidCosmosDataset(hdf5_path="euclid_cosmos_pairs_v3.h5")
     loader = DataLoader(dataset, batch_size=64, shuffle=True,
                         num_workers=4, collate_fn=collate_pairs,
                         persistent_workers=True, pin_memory=True)
     # Batch: (euclid_imgs, cosmos_imgs, metadata)
-    # euclid_imgs: (B, 1, H_euc, W_euc)
-    # cosmos_imgs: (B, 1, H_euc, W_euc)  ← downscaled to match Euclid
+    # euclid_imgs: (B, 1, H_SIZE, W_SIZE)
+    # cosmos_imgs: (B, 1, H_SIZE, W_SIZE)  ← both match eachother in size.
 """
 
 import h5py
@@ -32,8 +33,10 @@ from torch.utils.data import Dataset
 
 # Per-survey [mean, std] of preprocessed pixel values.
 NORM_DICT = {
-    "euclid": [0.037, 0.024],
-    "cosmos": [0.007, 0.158],
+    "euclid": [0.020, 0.019],
+    "euclid_up": [0.020, 0.019],
+    "cosmos": [0.040, 0.167],
+    "cosmos_ds": [0.040, 0.120],
 }
 
 
@@ -69,11 +72,11 @@ class EuclidCosmosDataset(Dataset):
     def __getitem__(self, idx):
         self._open_file()
 
-        euc = torch.from_numpy(self.file["euclid_images"][idx].copy())
+        euc = torch.from_numpy(self.file["euclid_images_upscaled"][idx].copy())
         cos = torch.from_numpy(self.file["cosmos_images_downscaled"][idx].copy())
 
-        euc_mean, euc_std = self.norm_dict["euclid"]
-        cos_mean, cos_std = self.norm_dict["cosmos"]
+        euc_mean, euc_std = self.norm_dict["euclid_up"]
+        cos_mean, cos_std = self.norm_dict["cosmos_ds"]  # using same stats for both COSMOS bands
         euc = (euc - euc_mean) / euc_std
         cos = (cos - cos_mean) / cos_std
 
@@ -100,20 +103,24 @@ def compute_norm_stats(hdf5_path: str, n_samples: int = 10_000) -> dict:
     Run this once after build_hdf5.py completes and update NORM_DICT.
 
     Example:
-        stats = compute_norm_stats("euclid_cosmos_pairs.h5")
+        stats = compute_norm_stats("euclid_cosmos_pairs_v3.h5")
         print(stats)
-        # {'euclid': [mean, std], 'cosmos': [mean, std]}
+        # {'euclid': [mean, std], "euclid_up": [mean, std], 'cosmos': [mean, std], 'cosmos_ds': [mean, std]}
     """
     rng = np.random.default_rng(42)
     with h5py.File(hdf5_path, "r") as f:
         N = int(f.attrs["num_pairs"])
         idx = np.sort(rng.choice(N, size=min(n_samples, N), replace=False))
+        euc_up = f["euclid_images_upscaled"][idx].reshape(-1)
+        cos_ds = f["cosmos_images_downscaled"][idx].reshape(-1)
+        cos = f["cosmos_images"][idx].reshape(-1)
         euc = f["euclid_images"][idx].reshape(-1)
-        cos = f["cosmos_images_downscaled"][idx].reshape(-1)
 
     stats = {
         "euclid": [float(euc.mean()), float(euc.std())],
+        "euclid_up": [float(euc_up.mean()), float(euc_up.std())],
         "cosmos": [float(cos.mean()), float(cos.std())],
+        "cosmos_ds": [float(cos_ds.mean()), float(cos_ds.std())],
     }
     print("Measured normalization stats:")
     for survey, (mean, std) in stats.items():
@@ -124,25 +131,26 @@ def compute_norm_stats(hdf5_path: str, n_samples: int = 10_000) -> dict:
 def main():
     from torch.utils.data import DataLoader
 
-    H5_PATH = "/n03data/fontirro/data_files/euclid_cosmos_pairs.h5"
+    H5_PATH = "/n03data/fontirro/data_files/euclid_cosmos_pairs_v3.h5"
 
     print("Computing normalization stats...")
     stats = compute_norm_stats(H5_PATH)
-
+    
     print("\nTesting dataset loading...")
     dataset = EuclidCosmosDataset(H5_PATH)
     print(f"  Dataset size: {len(dataset)}")
     euc, cos, meta = dataset[0]
     print(f"  Euclid shape: {euc.shape}, range [{euc.min():.3f}, {euc.max():.3f}]")
     print(f"  COSMOS shape: {cos.shape}, range [{cos.min():.3f}, {cos.max():.3f}]")
-
+    print(f" Euclid mean/std: {euc.mean():.5f} / {euc.std():.5f}")
+    print(f" COSMOS mean/std: {cos.mean():.5f} / {cos.std():.5f}")
+   
     loader = DataLoader(dataset, batch_size=32, shuffle=True,
                         num_workers=2, collate_fn=collate_pairs,
                         persistent_workers=True)
     euc_batch, cos_batch, _ = next(iter(loader))
     print(f"\n  Batch — Euclid: {euc_batch.shape}, COSMOS: {cos_batch.shape}")
     print("Done.")
-
 
 
 if __name__ == "__main__":

@@ -121,8 +121,8 @@ class EuclidCosmosModel(ConditionalFlowMatchingModule):
 # ---------------------------------------------------------------------------
 # CONFIG — edit before running
 # ---------------------------------------------------------------------------
-H5_PATH     = "/n03data/fontirro/data_files/euclid_cosmos_pairs.h5"
-CKPT_DIR    = "/n03data/fontirro/checkpoints/euclid-cosmos-phase1-v2"
+H5_PATH     = "/n03data/fontirro/data_files/euclid_cosmos_pairs_v3.h5"
+CKPT_DIR    = "/n03data/fontirro/checkpoints/euclid-cosmos-vis-f150w"
 
 BATCH_SIZE  = 64
 NUM_WORKERS = 16
@@ -135,6 +135,12 @@ LR          = 1e-4    #learning rate for AdamW optimizer
 N_GPUS      = 1       #set to number of GPUs on the node
 # ---------------------------------------------------------------------------
 
+
+def random_sameins(batch):
+    """Randomly select one same-instrument galaxy image in the batch, given the anchor."""
+    B = batch.shape[0]
+    idx = torch.randint(0, B, (1,))
+    return batch[idx].unsqueeze(1)  # (1, 1, H, W)
 
 def collate_fn(batch):
     """
