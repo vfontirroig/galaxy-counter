@@ -136,7 +136,7 @@ def main():
         ))
     valid = [zf < 0.10 for zf in zero_fracs]
     euclid_paths     = [p for p, v in zip(euclid_paths,     valid) if v]
-    cosmos_paths_f150w = [p for p, v in zip(cosmos_paths_f150w, valid) if v]
+    cosmos_paths = [p for p, v in zip(cosmos_paths, valid) if v]
     N_valid = len(euclid_paths)
     print(f"Valid pairs after filtering: {N_valid}/{N}  ({N - N_valid} skipped, zero_frac >= 10%)")
 
@@ -149,7 +149,7 @@ def main():
     # ------------------------------------------------------------------
     print("\nTesting first pair (sequential)...")
     _, t_euc, t_cos, _, t_euc_up, t_err = process_pair(
-        (0, euclid_paths[0], cosmos_paths_f150w[0])
+        (0, euclid_paths[0], cosmos_paths[0])
     )
     if t_err:
         print(f"[ERROR] First pair failed:\n{t_err}")
@@ -158,7 +158,7 @@ def main():
     print("OK.\n")
 
     H_euc, W_euc = get_spatial_size(euclid_paths[0], EUCLID_HDU)
-    H_cos, W_cos = get_spatial_size(cosmos_paths_f150w[0], COSMOS_HDU)
+    H_cos, W_cos = get_spatial_size(cosmos_paths[0], COSMOS_HDU)
     print(f"Euclid image size : {H_euc} x {W_euc}")
     print(f"COSMOS image size : {H_cos} x {W_cos}")
 
@@ -168,7 +168,7 @@ def main():
     # ------------------------------------------------------------------
 
 
-    args_list = [(i, ep, cp) for i, (ep, cp) in enumerate(zip(euclid_paths, cosmos_paths_f150w))]
+    args_list = [(i, ep, cp) for i, (ep, cp) in enumerate(zip(euclid_paths, cosmos_paths))]
 
     with h5py.File(OUTPUT_H5, "w") as f:
         euc_ds = f.create_dataset("euclid_images", shape=(N, 1, H_euc, W_euc), dtype=np.float32)
@@ -178,7 +178,7 @@ def main():
         cat_grp = f.create_group("catalog")
         dt = h5py.string_dtype()
         cat_grp.create_dataset("euclid_paths", data=np.array(euclid_paths, dtype=object), dtype=dt)
-        cat_grp.create_dataset("cosmos_paths", data=np.array(cosmos_paths_f150w, dtype=object), dtype=dt)
+        cat_grp.create_dataset("cosmos_paths", data=np.array(cosmos_paths, dtype=object), dtype=dt)
         f.attrs["num_pairs"] = N
         f.attrs["num_channels"] = 1
         f.attrs["euclid_shape"] = [H_euc, W_euc]
