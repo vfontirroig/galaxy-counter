@@ -136,7 +136,7 @@ N_GPUS      = 1       #set to number of GPUs on the node
 # ---------------------------------------------------------------------------
 
 
-def random_sameins(batch):
+def random_sameins(anchor, batch):
     """Randomly select one same-instrument galaxy image in the batch, given the anchor."""
     B = batch.shape[0]
     idx = torch.randint(0, B, (1,))
@@ -151,7 +151,7 @@ def collate_fn(batch):
     dataset: even indices → Euclid anchor, odd indices → COSMOS anchor.
     """
     anchor = torch.stack([b[0] for b in batch])   # (B, 1, H, W)
-    cond   = torch.stack([b[1] for b in batch])   # (B, 1, H, W)
+    cond   = torch.stack([b[1] for b in batch])   # (B, 1, H, W) samegal counterpart
     B = anchor.shape[0]
 
     sameins  = cond.unsqueeze(1)                  # (B, 1, 1, H, W)

@@ -1,7 +1,7 @@
 """
 Explore Euclid and COSMOS cutout statistics to calibrate BAND_CENTER_MAX.
 
-In a first step, this script only works with the VIS band (Euclid) and F115W band (COSMOS).
+In a first step, this script only works with the VIS band (Euclid) and F150W band (COSMOS).
 TODO: add other bands (e.g., Y, J, H for Euclid and F150W, F277W for COSMOS).
 
 Edit the CONFIG block below to match your directory layout and band suffixes,
@@ -19,7 +19,7 @@ from astropy.io import fits
 # ---------------------------------------------------------------------------
 
 EUCLID_DIR_VIS = "/n03data/fontirro/euclid/40_cutouts/40_cutouts-vis"  # directory containing Euclid FITS files
-COSMOS_DIR_F115W = "/n03data/fontirro/cosmos/120_cutouts/f115w"  # directory containing COSMOS FITS files
+COSMOS_DIR_F150W = "/n03data/fontirro/cosmos/120_cutouts/f150w"  # directory containing COSMOS FITS files
 
 # glob pattern to find Euclid files inside their respective directories
 EUCLID_PATTERN = "*.fits"
@@ -48,9 +48,9 @@ def load_euclid(path: str) -> np.ndarray:
 
 
 def load_cosmos(path: str) -> np.ndarray:
-    """Load F115W band COSMOS galaxy from a FITS files.
+    """Load F150W band COSMOS galaxy from a FITS files.
     Args:
-        path: full path to the F115W band FITS file
+        path: full path to the F150W band FITS file
     Returns:
         (1, H, W) array of pixel values (1 channel, height, width)
     """
@@ -120,7 +120,7 @@ def main():
 
     
     # --- COSMOS ---
-    cosmos_files = sorted(glob.glob(os.path.join(COSMOS_DIR_F115W, COSMOS_PATTERN)))
+    cosmos_files = sorted(glob.glob(os.path.join(COSMOS_DIR_F150W, COSMOS_PATTERN)))
     print(f"\nFound {len(cosmos_files)} COSMOS files")
     cosmos_files = sample_files(cosmos_files, N_SAMPLE)
 
@@ -143,7 +143,7 @@ def main():
                 f"  p0.1={s['p0.1']:.4g}  p99={s['p99']:.4g}  p99.9={s['p99.9']:.4g}")
 
     print("\n" + "=" * 55)
-    print("COSMOS  (1 channels - F115W band)")
+    print("COSMOS  (1 channels - F150W band)")
     print("=" * 55)
     cosmos_stats = channel_stats(cosmos_stack)
     for ci, s in cosmos_stats.items():
