@@ -8,20 +8,22 @@ import matplotlib.pyplot as plt
 import h5py
 from astropy.visualization import ImageNormalize, PercentileInterval, AsinhStretch
 
-H5_PATH = "/n03data/fontirro/data_files/euclid_cosmos_pairs.h5"
-OUT_DIR = "/n03data/fontirro/output_plots/"
+H5_PATH = "/n03data/fontirro/data_files/euclid_cosmos_pairs_v3.h5"
+OUT_DIR = "/n03data/fontirro/plots_examples/downs_ups_examples"
 
 
-def _render_pair(axes, euc_data, cos_data_down, cos_data, idx, id_euc, id_cos):
+def _render_pair(axes, euc_data, euc_data_up, cos_data_down, cos_data, idx, id_euc, id_cos):
     for ax in axes:
         ax.cla()
     axes[0].imshow(euc_data, cmap="gray")
     axes[0].set_title(f"Euclid  (idx={idx})\n{id_euc}")
-    axes[1].imshow(cos_data_down, cmap="gray")
-    axes[1].set_title(f"COSMOS (downscaled)  (idx={idx})\n{id_cos}")
-    axes[2].imshow(cos_data, cmap="gray",
-                   norm=ImageNormalize(cos_data, interval=PercentileInterval(99.5), stretch=AsinhStretch()))
+    axes[1].imshow(euc_data_up, cmap="gray")
+    axes[1].set_title(f"Euclid upscaled (idx={idx})\n{id_euc}")
+    axes[2].imshow(cos_data, cmap="gray")
+                   #norm=ImageNormalize(cos_data, interval=PercentileInterval(99.5), stretch=AsinhStretch()))
     axes[2].set_title(f"COSMOS  (idx={idx})\n{id_cos}")
+    axes[3].imshow(cos_data_down, cmap="gray")
+    axes[3].set_title(f"COSMOS downscaled (idx={idx})\n{id_cos}")
 
 
 def main():
@@ -32,7 +34,7 @@ def main():
     parser.add_argument("--end", type=int, default=None, help="Last index (exclusive); defaults to all")
     args = parser.parse_args()
 
-    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+    fig, axes = plt.subplots(1, 4, figsize=(20, 5))
 
     with h5py.File(args.h5, "r") as f:
         N = int(f.attrs["num_pairs"])
@@ -40,6 +42,7 @@ def main():
 
         for idx in range(args.start, end):
             euc_data   = f["euclid_images"][idx, 0]
+            euc_data_up = f["euclid_images_upscaled"][idx, 0]
             cos_data_d = f["cosmos_images_downscaled"][idx, 0]
             cos_data   = f["cosmos_images"][idx, 0]
             euc_path   = f["catalog/euclid_paths"][idx].decode()
@@ -52,7 +55,7 @@ def main():
             if os.path.exists(out_file):
                 continue
 
-            _render_pair(axes, euc_data, cos_data_d, cos_data, idx, id_euc, id_cos)
+            _render_pair(axes, euc_data, euc_data_up, cos_data_d, cos_data, idx, id_euc, id_cos)
             plt.tight_layout()
             plt.savefig(out_file, dpi=150, bbox_inches="tight")
 
