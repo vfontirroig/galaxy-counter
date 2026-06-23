@@ -28,23 +28,26 @@ import os
 # CONFIG — edit these before running
 # ---------------------------------------------------------------------------
 
-CATALOG_PATH = "/n03data/fontirro/data_files/cat_crossmatch_mag27.csv"  # path to the paired catalog
+CATALOG_PATH = "/n03data/fontirro/data_files/cat_crossmatch_mag27_mag25.csv"  # path to the paired catalog
 
 EUCLID_COL = "file_euclid_vis"              # column name for the Euclid FITS file path
-COSMOS_COL = "file_cosmos_f115w"            # column name for the COSMOS FITS file path
+COSMOS_COL = "file_cosmos_f150w"            # column name for the COSMOS FITS file path
 
 EUCLID_EXISTS_COL = "cutout_euc_40_vis"    # boolean column: True if Euclid cutout exists
-COSMOS_EXISTS_COL = "cutout_cos_120_115w"  # boolean column: True if COSMOS cutout exists
+COSMOS_EXISTS_COL = "cutout_cos_120_150w"  # boolean column: True if COSMOS cutout exists
 
 EUCLID_DIR_PATH = "/n03data/fontirro/euclid/40_cutouts/40_cutouts-vis/"  # base directory for Euclid VIS cutouts.
-COSMOS_DIR_PATH = "/n03data/fontirro/cosmos/120_cutouts/f115w/"  # base directory for COSMOS F115W cutouts.
+COSMOS_DIR_PATH = "/n03data/fontirro/cosmos/120_cutouts/f150w/"  # base directory for COSMOS F150W cutouts.
 
 EUCLID_HDU = 1   # HDU index for Euclid data (usually 1 for science extension)
 COSMOS_HDU = 0   # HDU index for COSMOS data (usually 0)
 
-OUTPUT_H5 = "/n03data/fontirro/data_files/euclid_cosmos_pairs.h5"
+OUTPUT_H5 = "/n03data/fontirro/data_files/euclid_cosmos_pairs_v3.h5"
 
 NUM_WORKERS = 16  # parallel threads for loading + preprocessing
+
+H_SIZE = 64  # target spatial size for both Euclid and COSMOS (COSMOS will be downscaled to match Euclid)
+W_SIZE = 64  # target spatial size for both Euclid and COSMOS (COSMOS will be downscaled to match Euclid)
 
 # ---------------------------------------------------------------------------
 
@@ -52,7 +55,7 @@ import numpy as np
 import pandas as pd
 import h5py
 from astropy.io import fits
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from tqdm import tqdm
 import torch
 import torch.nn.functional as F
@@ -74,22 +77,32 @@ def get_spatial_size(path: str, hdu: int) -> tuple[int, int]:
         data = hdul[hdu].data
     return data.shape[-2], data.shape[-1]
 
+def euclid_zero_frac(path: str) -> float:
+    """Return fraction of zero pixels in a Euclid FITS cutout (numpy only, no torch)."""
+    with fits.open(path, memmap=False) as hdul:
+        data = hdul[EUCLID_HDU].data.astype(np.float32)
+    return float(np.mean(data == 0))
+
 
 def process_pair(args: tuple) -> tuple:
-    """Load, preprocess, and downscale one pair. Returns (i, euc, cos, cos_down, error)."""
-    i, ep, cp, h_euc, w_euc = args
+    """Load, preprocess, downscale cosmos, and upscale euclid. Returns (i, euc, cos, cos_down, euc_up, error)."""
+    i, ep, cp  = args
     try:
         euc_tensor = load_fits(ep, EUCLID_HDU)
         cos_tensor = load_fits(cp, COSMOS_HDU)
         euc = preprocess_image_v2(euc_tensor, bands=["VIS"]).squeeze(0).numpy()
-        cos = preprocess_image_v2(cos_tensor, bands=["F115W"]).squeeze(0).numpy()
+        cos = preprocess_image_v2(cos_tensor, bands=["F150W"]).squeeze(0).numpy()
         cos_down = F.interpolate(
-            torch.from_numpy(cos).unsqueeze(0), size=(h_euc, w_euc),
-            mode="bilinear", align_corners=False,
-        ).squeeze(0).numpy()
-        return i, euc, cos, cos_down, None
+            torch.from_numpy(cos).unsqueeze(0), size=(H_SIZE, W_SIZE),
+            mode="area",
+        ).squeeze(0).numpy() #(1, H_SIZE, W_SIZE)
+        euc_up = F.interpolate(
+            torch.from_numpy(euc).unsqueeze(0), size=(H_SIZE, W_SIZE),
+            mode="bilinear", align_corners=True,
+        ).squeeze(0).numpy() #(1, H_SIZE, W_SIZE)
+        return i, euc, cos, cos_down, euc_up, None
     except Exception as e:
-        return i, None, None, None, str(e)
+        return i, None, None, None, None, str(e)
 
 
 def main():
@@ -110,26 +123,74 @@ def main():
     print(f"Euclid image size : {H_euc} x {W_euc}")
     print(f"COSMOS image size : {H_cos} x {W_cos}")
 
-    args_list = [(i, ep, cp, H_euc, W_euc) for i, (ep, cp) in enumerate(zip(euclid_paths, cosmos_paths))]
+
+    # ------------------------------------------------------------------
+    # Pass 1: filter out Euclid cutouts with >= 10% zero pixels
+    # Uses threads (I/O bound, no torch) so no fork/spawn overhead.
+    # ------------------------------------------------------------------
+    print(f"\nScanning {N} Euclid files for zero-pixel fraction...")
+    with ThreadPoolExecutor(max_workers=NUM_WORKERS) as pool:
+        zero_fracs = list(tqdm(
+            pool.map(euclid_zero_frac, euclid_paths),
+            total=N, desc="Scanning", mininterval=5,
+        ))
+    valid = [zf < 0.10 for zf in zero_fracs]
+    euclid_paths     = [p for p, v in zip(euclid_paths,     valid) if v]
+    cosmos_paths_f150w = [p for p, v in zip(cosmos_paths_f150w, valid) if v]
+    N_valid = len(euclid_paths)
+    print(f"Valid pairs after filtering: {N_valid}/{N}  ({N - N_valid} skipped, zero_frac >= 10%)")
+
+    if N_valid == 0:
+        print("[ERROR] No valid pairs found — check EUCLID_HDU and file paths.")
+        sys.exit(1)
+
+    # ------------------------------------------------------------------
+    # Quick sanity check on first valid pair
+    # ------------------------------------------------------------------
+    print("\nTesting first pair (sequential)...")
+    _, t_euc, t_cos, _, t_euc_up, t_err = process_pair(
+        (0, euclid_paths[0], cosmos_paths_f150w[0])
+    )
+    if t_err:
+        print(f"[ERROR] First pair failed:\n{t_err}")
+        sys.exit(1)
+    print(f"  euc [{t_euc.min():.4f}, {t_euc.max():.4f}]  euc_up [{t_euc_up.min():.4f}, {t_euc_up.max():.4f}]  cos [{t_cos.min():.4f}, {t_cos.max():.4f}]")
+    print("OK.\n")
+
+    H_euc, W_euc = get_spatial_size(euclid_paths[0], EUCLID_HDU)
+    H_cos, W_cos = get_spatial_size(cosmos_paths_f150w[0], COSMOS_HDU)
+    print(f"Euclid image size : {H_euc} x {W_euc}")
+    print(f"COSMOS image size : {H_cos} x {W_cos}")
+
+   
+    # ------------------------------------------------------------------
+    # Pass 2: process and write — dense, no empty slots
+    # ------------------------------------------------------------------
+
+
+    args_list = [(i, ep, cp) for i, (ep, cp) in enumerate(zip(euclid_paths, cosmos_paths_f150w))]
 
     with h5py.File(OUTPUT_H5, "w") as f:
         euc_ds = f.create_dataset("euclid_images", shape=(N, 1, H_euc, W_euc), dtype=np.float32)
         cos_ds = f.create_dataset("cosmos_images", shape=(N, 1, H_cos, W_cos), dtype=np.float32)
-        cos_down_ds = f.create_dataset("cosmos_images_downscaled", shape=(N, 1, H_euc, W_euc), dtype=np.float32)
+        cos_down_ds = f.create_dataset("cosmos_images_downscaled", shape=(N, 1, H_SIZE, W_SIZE), dtype=np.float32)
+        euc_up_ds = f.create_dataset("euclid_images_upscaled", shape=(N, 1, H_SIZE, W_SIZE), dtype=np.float32)
         cat_grp = f.create_group("catalog")
         dt = h5py.string_dtype()
         cat_grp.create_dataset("euclid_paths", data=np.array(euclid_paths, dtype=object), dtype=dt)
-        cat_grp.create_dataset("cosmos_paths", data=np.array(cosmos_paths, dtype=object), dtype=dt)
+        cat_grp.create_dataset("cosmos_paths", data=np.array(cosmos_paths_f150w, dtype=object), dtype=dt)
         f.attrs["num_pairs"] = N
         f.attrs["num_channels"] = 1
         f.attrs["euclid_shape"] = [H_euc, W_euc]
         f.attrs["cosmos_shape"] = [H_cos, W_cos]
+        f.attrs["euclid_upscaled_shape"] = [H_SIZE, W_SIZE]
+        f.attrs["cosmos_downscaled_shape"] = [H_SIZE, W_SIZE]
 
         skipped = 0
         with ProcessPoolExecutor(max_workers=NUM_WORKERS) as executor:
             results = executor.map(process_pair, args_list, chunksize=100)
             for result in tqdm(results, total=N, desc="Processing", mininterval=60, dynamic_ncols=False):
-                i, euc, cos, cos_down, err = result
+                i, euc, cos, cos_down, euc_up, err = result
                 if err:
                     print(f"\n  [WARN] skipping pair {i}: {err}")
                     skipped += 1
@@ -137,6 +198,7 @@ def main():
                 euc_ds[i] = euc
                 cos_ds[i] = cos
                 cos_down_ds[i] = cos_down
+                euc_up_ds[i] = euc_up
 
     print(f"\nDone. {N - skipped}/{N} pairs written to {OUTPUT_H5}")
     if skipped:
