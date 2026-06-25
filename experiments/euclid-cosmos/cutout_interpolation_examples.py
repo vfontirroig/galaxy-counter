@@ -15,9 +15,6 @@ CATALOG_PATH = "/n03data/fontirro/data_files/cat_crossmatch_mag27_mag25.csv"  # 
 EUCLID_COL = "file_euclid_vis"              # column name for the Euclid FITS file path
 COSMOS_COL = "file_cosmos_f150w"            # column name for the COSMOS FITS file path
 
-EUCLID_EXISTS_COL = "cutout_euc_40_vis"    # boolean column: True if Euclid cutout exists
-COSMOS_EXISTS_COL = "cutout_cos_120_150w"  # boolean column: True if COSMOS cutout exists
-
 OUTPUT_DIR = "/n03data/fontirro/plots_examples/cutout_interpolation_examples"  # output directory for the cutout examples
 
 MODES = ["nearest", "nearest-exact", "bilinear", "bicubic", "area"]  # interpolation modes to test
@@ -68,9 +65,6 @@ def euclid_zero_frac(path: str) -> float:
 def main():
     # Load the catalog
     df = pd.read_csv(CATALOG_PATH)  
-
-    # Filter for existing cutouts
-    df = df[df[EUCLID_EXISTS_COL] & df[COSMOS_EXISTS_COL]]
 
     #randomly select one galaxy from the filtered catalog
     df = df.sample(n=1)
