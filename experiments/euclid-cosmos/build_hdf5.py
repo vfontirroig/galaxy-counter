@@ -42,7 +42,7 @@ COSMOS_DIR_PATH = "/n03data/fontirro/cutouts/cosmos/120_cutouts/f150w/"  # base 
 EUCLID_HDU = 1   # HDU index for Euclid data (usually 1 for science extension)
 COSMOS_HDU = 0   # HDU index for COSMOS data (usually 0)
 
-OUTPUT_H5 = "/n03data/fontirro/data_files/euclid_cosmos_pairs_v3.h5"
+OUTPUT_H5 = "/n03data/fontirro/data_files/euclid_cosmos_test_pairs.h5"
 
 NUM_WORKERS = 16  # parallel threads for loading + preprocessing
 
@@ -135,7 +135,7 @@ def main():
             total=N, desc="Scanning", mininterval=5,
         ))
     valid = [zf < 0.10 for zf in zero_fracs]
-    euclid_paths     = [p for p, v in zip(euclid_paths,     valid) if v]
+    euclid_paths     = [p for p, v in zip(euclid_paths, valid) if v]
     cosmos_paths = [p for p, v in zip(cosmos_paths, valid) if v]
     N_valid = len(euclid_paths)
     print(f"Valid pairs after filtering: {N_valid}/{N}  ({N - N_valid} skipped, zero_frac >= 10%)")
@@ -164,45 +164,64 @@ def main():
 
    
     # ------------------------------------------------------------------
-    # Pass 2: process and write — dense, no empty slots
+    # Pass 2: process and write — pairs that fail processing are dropped
+    # (not left as zero-filled rows); datasets are shrunk to the final
+    # count at the end so the catalogue only contains real cutouts.
     # ------------------------------------------------------------------
-
 
     args_list = [(i, ep, cp) for i, (ep, cp) in enumerate(zip(euclid_paths, cosmos_paths))]
 
     with h5py.File(OUTPUT_H5, "w") as f:
-        euc_ds = f.create_dataset("euclid_images", shape=(N, 1, H_euc, W_euc), dtype=np.float32)
-        cos_ds = f.create_dataset("cosmos_images", shape=(N, 1, H_cos, W_cos), dtype=np.float32)
-        cos_down_ds = f.create_dataset("cosmos_images_downscaled", shape=(N, 1, H_SIZE, W_SIZE), dtype=np.float32)
-        euc_up_ds = f.create_dataset("euclid_images_upscaled", shape=(N, 1, H_SIZE, W_SIZE), dtype=np.float32)
+        euc_ds = f.create_dataset("euclid_images", shape=(N_valid, 1, H_euc, W_euc),
+                                   maxshape=(N_valid, 1, H_euc, W_euc), chunks=True, dtype=np.float32)
+        cos_ds = f.create_dataset("cosmos_images", shape=(N_valid, 1, H_cos, W_cos),
+                                   maxshape=(N_valid, 1, H_cos, W_cos), chunks=True, dtype=np.float32)
+        cos_down_ds = f.create_dataset("cosmos_images_downscaled", shape=(N_valid, 1, H_SIZE, W_SIZE),
+                                        maxshape=(N_valid, 1, H_SIZE, W_SIZE), chunks=True, dtype=np.float32)
+        euc_up_ds = f.create_dataset("euclid_images_upscaled", shape=(N_valid, 1, H_SIZE, W_SIZE),
+                                      maxshape=(N_valid, 1, H_SIZE, W_SIZE), chunks=True, dtype=np.float32)
+
+        kept_euclid_paths = []
+        kept_cosmos_paths = []
+        write_idx = 0
+        skipped = 0
+        with ProcessPoolExecutor(max_workers=NUM_WORKERS) as executor:
+            results = executor.map(process_pair, args_list, chunksize=100)
+            for result in tqdm(results, total=N_valid, desc="Processing", mininterval=60, dynamic_ncols=False):
+                i, euc, cos, cos_down, euc_up, err = result
+                if err:
+                    print(f"\n  [WARN] skipping pair {i}: {err}")
+                    skipped += 1
+                    continue
+                euc_ds[write_idx] = euc
+                cos_ds[write_idx] = cos
+                cos_down_ds[write_idx] = cos_down
+                euc_up_ds[write_idx] = euc_up
+                kept_euclid_paths.append(euclid_paths[i])
+                kept_cosmos_paths.append(cosmos_paths[i])
+                write_idx += 1
+
+        N_final = write_idx
+        if N_final < N_valid:
+            euc_ds.resize((N_final, 1, H_euc, W_euc))
+            cos_ds.resize((N_final, 1, H_cos, W_cos))
+            cos_down_ds.resize((N_final, 1, H_SIZE, W_SIZE))
+            euc_up_ds.resize((N_final, 1, H_SIZE, W_SIZE))
+
         cat_grp = f.create_group("catalog")
         dt = h5py.string_dtype()
-        cat_grp.create_dataset("euclid_paths", data=np.array(euclid_paths, dtype=object), dtype=dt)
-        cat_grp.create_dataset("cosmos_paths", data=np.array(cosmos_paths, dtype=object), dtype=dt)
-        f.attrs["num_pairs"] = N
+        cat_grp.create_dataset("euclid_paths", data=np.array(kept_euclid_paths, dtype=object), dtype=dt)
+        cat_grp.create_dataset("cosmos_paths", data=np.array(kept_cosmos_paths, dtype=object), dtype=dt)
+        f.attrs["num_pairs"] = N_final
         f.attrs["num_channels"] = 1
         f.attrs["euclid_shape"] = [H_euc, W_euc]
         f.attrs["cosmos_shape"] = [H_cos, W_cos]
         f.attrs["euclid_upscaled_shape"] = [H_SIZE, W_SIZE]
         f.attrs["cosmos_downscaled_shape"] = [H_SIZE, W_SIZE]
 
-        skipped = 0
-        with ProcessPoolExecutor(max_workers=NUM_WORKERS) as executor:
-            results = executor.map(process_pair, args_list, chunksize=100)
-            for result in tqdm(results, total=N, desc="Processing", mininterval=60, dynamic_ncols=False):
-                i, euc, cos, cos_down, euc_up, err = result
-                if err:
-                    print(f"\n  [WARN] skipping pair {i}: {err}")
-                    skipped += 1
-                    continue
-                euc_ds[i] = euc
-                cos_ds[i] = cos
-                cos_down_ds[i] = cos_down
-                euc_up_ds[i] = euc_up
-
-    print(f"\nDone. {N - skipped}/{N} pairs written to {OUTPUT_H5}")
+    print(f"\nDone. {N_final}/{N_valid} pairs written to {OUTPUT_H5}")
     if skipped:
-        print(f"  {skipped} pairs skipped due to errors.")
+        print(f"  {skipped} pairs skipped due to processing errors and dropped from the catalogue.")
 
 
 if __name__ == "__main__":
