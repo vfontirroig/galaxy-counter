@@ -93,11 +93,11 @@ def main():
 
     # Display original Euclid and COSMOS cutouts
     axes[0, 0].imshow(euclid_cutout.squeeze().numpy(), cmap='gray')
-    axes[0, 0].set_title(f"Euclid Cutout\nID: {euc_id}\nVis Mag: {vis_mag:.2f}")
+    axes[0, 0].set_title(f"Euclid Cutout (40x40)\nID: {euc_id}\nVis Mag: {vis_mag:.2f}")
     axes[0, 0].axis('off')
 
     axes[1, 0].imshow(cosmos_cutout.squeeze().numpy(), cmap='gray')
-    axes[1, 0].set_title(f"COSMOS Cutout\nID: {cos_id}\nF150W Mag: {f150w_mag:.2f}")
+    axes[1, 0].set_title(f"COSMOS Cutout (120x120)\nID: {cos_id}\nF150W Mag: {f150w_mag:.2f}")
     axes[1, 0].axis('off')  
 
     # Interpolate COSMOS cutout to match Euclid size using different modes
@@ -105,12 +105,12 @@ def main():
         # Use torch.nn.functional.interpolate for resizing
         euclid_resized = F.interpolate(euclid_cutout, size=(H_SIZE, W_SIZE), mode=mode)
         axes[0, i + 1].imshow(euclid_resized.squeeze().numpy(), cmap='gray')
-        axes[0, i + 1].set_title(f"Euclid Resized\nMode: {mode}")
+        axes[0, i + 1].set_title(f"Euclid Resized (64x64)\nMode: {mode}")
         axes[0, i + 1].axis('off')
 
         cosmos_resized = F.interpolate(cosmos_cutout, size=(H_SIZE, W_SIZE), mode=mode)
         axes[1, i + 1].imshow(cosmos_resized.squeeze().numpy(), cmap='gray')
-        axes[1, i + 1].set_title(f"COSMOS Resized\nMode: {mode}")
+        axes[1, i + 1].set_title(f"COSMOS Resized (64x64)\nMode: {mode}")
         axes[1, i + 1].axis('off')
 
     plt.tight_layout()
