@@ -70,7 +70,7 @@ def main():
     df = df.sample(n=1)
     cos_id = df.iloc[0]["id"]
     euc_id = df.iloc[0]["object_id"]
-    vis_mag = df.iloc[0]["vis_mag"]
+    vis_mag = df.iloc[0]["vis_AB_mag"]
     f150w_mag = df.iloc[0][ "mag_model_f150w"]
     euclid_path = df.iloc[0][EUCLID_COL]
     cosmos_path = df.iloc[0][COSMOS_COL]
