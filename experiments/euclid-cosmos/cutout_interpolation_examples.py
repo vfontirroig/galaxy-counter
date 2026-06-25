@@ -12,8 +12,11 @@ import os
 
 CATALOG_PATH = "/n03data/fontirro/data_files/cat_crossmatch_mag27_mag25.csv"  # path to the paired catalog
 
-EUCLID_COL = "file_euclid_vis"              # column name for the Euclid FITS file path
-COSMOS_COL = "file_cosmos_f150w"            # column name for the COSMOS FITS file path
+EUCLID_COL = "file_euclid_vis"              # column name for the Euclid FITS file name
+COSMOS_COL = "file_cosmos_f150w"            # column name for the COSMOS FITS file name
+
+EUCLID_PATH_PREFIX = "/n03data/fontirro/cutouts/euclid/40_cutouts/40_cutouts_vis"  # prefix path for Euclid cutouts
+COSMOS_PATH_PREFIX = "/n03data/fontirro/cutouts/cosmos/120_cutouts/f150w/"  # prefix path for COSMOS cutouts
 
 OUTPUT_DIR = "/n03data/fontirro/plots_examples/cutout_interpolation_examples"  # output directory for the cutout examples
 
@@ -72,8 +75,8 @@ def main():
     euc_id = df.iloc[0]["object_id"]
     vis_mag = df.iloc[0]["vis_AB_mag"]
     f150w_mag = df.iloc[0][ "mag_model_f150w"]
-    euclid_path = df.iloc[0][EUCLID_COL]
-    cosmos_path = df.iloc[0][COSMOS_COL]
+    euclid_path = EUCLID_PATH_PREFIX + df.iloc[0][EUCLID_COL]
+    cosmos_path = COSMOS_PATH_PREFIX + df.iloc[0][COSMOS_COL]
 
     # Create output directory if it doesn't exist
     os.makedirs(OUTPUT_DIR, exist_ok=True)
