@@ -38,6 +38,9 @@ from astropy.io import fits
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 import torch
 import torch.nn.functional as F
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 from image_preprocessing import preprocess_image_v2
 
 
@@ -104,3 +107,7 @@ def main():
     plt.savefig(os.path.join(OUTPUT_DIR, f"cutout_interpolation_examples_{cos_id}_{euc_id}.png"), dpi=300)
 
     print(f"Saved cutout interpolation examples for COSMOS ID {cos_id} and Euclid ID {euc_id} to {OUTPUT_DIR}")
+
+
+if __name__ == "__main__":
+    main()
