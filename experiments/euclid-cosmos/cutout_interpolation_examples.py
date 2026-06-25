@@ -103,12 +103,12 @@ def main():
     # Interpolate COSMOS cutout to match Euclid size using different modes
     for i, mode in enumerate(MODES):
         # Use torch.nn.functional.interpolate for resizing
-        euclid_resized = F.interpolate(euclid_cutout, size=(H_SIZE, W_SIZE), mode=mode, align_corners=False)
+        euclid_resized = F.interpolate(euclid_cutout, size=(H_SIZE, W_SIZE), mode=mode)
         axes[0, i + 1].imshow(euclid_resized.squeeze().numpy(), cmap='gray')
         axes[0, i + 1].set_title(f"Euclid Resized\nMode: {mode}")
         axes[0, i + 1].axis('off')
 
-        cosmos_resized = F.interpolate(cosmos_cutout, size=(H_SIZE, W_SIZE), mode=mode, align_corners=False)
+        cosmos_resized = F.interpolate(cosmos_cutout, size=(H_SIZE, W_SIZE), mode=mode)
         axes[1, i + 1].imshow(cosmos_resized.squeeze().numpy(), cmap='gray')
         axes[1, i + 1].set_title(f"COSMOS Resized\nMode: {mode}")
         axes[1, i + 1].axis('off')
