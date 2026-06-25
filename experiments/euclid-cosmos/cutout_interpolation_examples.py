@@ -86,8 +86,8 @@ def main():
     cosmos_cutout = load_fits(cosmos_path, COSMOS_HDU)
 
     # Preprocess images (normaliation and range compression)
-    euclid_cutout = preprocess_image_v2(euclid_cutout)
-    cosmos_cutout = preprocess_image_v2(cosmos_cutout)
+    euclid_cutout = preprocess_image_v2(euclid_cutout, bands=["VIS"]).squeeze(0).numpy()
+    cosmos_cutout = preprocess_image_v2(cosmos_cutout, bands=["F150W"]).squeeze(0).numpy()
 
     fig, axes = plt.subplots(2, len(MODES) + 1, figsize=(30, 10))
 
