@@ -15,7 +15,7 @@ CATALOG_PATH = "/n03data/fontirro/data_files/cat_crossmatch_mag27_mag25.csv"  # 
 EUCLID_COL = "file_euclid_vis"              # column name for the Euclid FITS file name
 COSMOS_COL = "file_cosmos_f150w"            # column name for the COSMOS FITS file name
 
-EUCLID_PATH_PREFIX = "/n03data/fontirro/cutouts/euclid/40_cutouts/40_cutouts_vis/"  # prefix path for Euclid cutouts
+EUCLID_PATH_PREFIX = "/n03data/fontirro/cutouts/euclid/40_cutouts/40_cutouts-vis/"  # prefix path for Euclid cutouts
 COSMOS_PATH_PREFIX = "/n03data/fontirro/cutouts/cosmos/120_cutouts/f150w/"  # prefix path for COSMOS cutouts
 
 OUTPUT_DIR = "/n03data/fontirro/plots_examples/cutout_interpolation_examples"  # output directory for the cutout examples
