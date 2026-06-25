@@ -98,7 +98,7 @@ def process_pair(args: tuple) -> tuple:
         ).squeeze(0).numpy() #(1, H_SIZE, W_SIZE)
         euc_up = F.interpolate(
             torch.from_numpy(euc).unsqueeze(0), size=(H_SIZE, W_SIZE),
-            mode="bilinear", align_corners=True,
+            mode="bilinear",
         ).squeeze(0).numpy() #(1, H_SIZE, W_SIZE)
         return i, euc, cos, cos_down, euc_up, None
     except Exception as e:
