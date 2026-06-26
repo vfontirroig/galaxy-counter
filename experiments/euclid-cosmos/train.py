@@ -5,9 +5,7 @@ Train the flow-matching model on paired Euclid (VIS) x COSMOS (F115W) cutouts.
 
 Phase 1 (this script): simple pairs, no same-instrument neighbors.
   - encoder_1 conditions on the COSMOS counterpart of the same galaxy.
-  - encoder_2 receives a dummy copy of the COSMOS image (k=1 stand-in).
-    It will be replaced by real Euclid neighbors in Phase 2 after neighbors
-    are computed from the trained model's embeddings.
+  - encoder_2 receives a random galaxy from the same instrument as the anchor.
   - lambda_geometric=0 because without real Euclid neighbors, the geometric
     loss has no meaningful signal for encoder_2.
 
@@ -122,7 +120,7 @@ class EuclidCosmosModel(ConditionalFlowMatchingModule):
 # CONFIG — edit before running
 # ---------------------------------------------------------------------------
 H5_PATH     = "/n03data/fontirro/data_files/euclid_cosmos_pairs_v3.h5"
-CKPT_DIR    = "/n03data/fontirro/checkpoints/euclid-cosmos-vis-f150w"
+CKPT_DIR    = "/n03data/fontirro/checkpoints/euclid-cosmos-vis-f150w/test-phase1"  # where to save checkpoints and logs
 
 BATCH_SIZE  = 64
 NUM_WORKERS = 16
@@ -136,11 +134,31 @@ N_GPUS      = 1       #set to number of GPUs on the node
 # ---------------------------------------------------------------------------
 
 
-def random_sameins(anchor, batch):
-    """Randomly select one same-instrument galaxy image in the batch, given the anchor."""
-    B = batch.shape[0]
-    idx = torch.randint(0, B, (1,))
-    return batch[idx].unsqueeze(1)  # (1, 1, H, W)
+def random_sameins(anchor: torch.Tensor, instrument: torch.Tensor) -> torch.Tensor:
+    """For each row, randomly pick a different galaxy of the same instrument.
+
+    anchor mixes instruments row-by-row (bidirectional dataset), so candidates
+    are restricted to rows sharing the same `instrument` label — never the
+    other instrument.
+
+    Args:
+        anchor: (B, 1, H, W) tensor of galaxy images, mixed instruments.
+        instrument: (B,) tensor of per-row instrument labels (e.g. 0/1).
+
+    Returns:
+        (B, 1, H, W) tensor — for each row i, a different row j with
+        instrument[j] == instrument[i], excluding row i itself.
+    """
+    out = anchor.clone()
+    for label in instrument.unique(): #overall: for each instrument, find the rows they share the same instrument and skip them. 
+        group_idx = torch.nonzero(instrument == label).flatten() #gives a boolean mask. True if the instrument is the same as the galaxy's.
+        n = group_idx.numel() #how many rows belong to the instrument
+        if n <= 1:
+            continue
+        local = torch.randint(0, n - 1, (n,), device=anchor.device) #devide is used so it can run with a cpu or gpu without any problem. 
+        local = local + (local >= torch.arange(n, device=anchor.device))  # skip self
+        out[group_idx] = anchor[group_idx[local]]
+    return out  # (B, 1, H, W)
 
 def collate_fn(batch):
     """
@@ -153,10 +171,13 @@ def collate_fn(batch):
     anchor = torch.stack([b[0] for b in batch])   # (B, 1, H, W)
     cond   = torch.stack([b[1] for b in batch])   # (B, 1, H, W) samegal counterpart
     B = anchor.shape[0]
-
-    sameins  = cond.unsqueeze(1)                  # (B, 1, 1, H, W)
-    masks    = torch.ones(B, 1, dtype=torch.bool)
     metadata = [b[2] for b in batch]
+
+    # 0 = euclid anchor, 1 = cosmos anchor — keeps random_sameins from ever crossing into the other instrument.
+    instrument = torch.tensor([0 if m["anchor_survey"] == "euclid" else 1 for m in metadata])
+
+    sameins = random_sameins(anchor, instrument).unsqueeze(1)  # (B, k=1, 1, H, W)
+    masks    = torch.ones(B, 1, dtype=torch.bool)
     return anchor, cond, sameins, masks, metadata
 
 
