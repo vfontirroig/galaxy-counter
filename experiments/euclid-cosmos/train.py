@@ -3,11 +3,13 @@ TEST!!!!!!!!
 
 Train the flow-matching model on paired Euclid (VIS) x COSMOS (F115W) cutouts.
 
-Phase 1 (this script): simple pairs, no same-instrument neighbors.
+Phase 1 (this script): simple pairs, no precomputed same-instrument neighbors.
   - encoder_1 conditions on the COSMOS counterpart of the same galaxy.
-  - encoder_2 receives a random galaxy from the same instrument as the anchor.
-  - lambda_geometric=0 because without real Euclid neighbors, the geometric
-    loss has no meaningful signal for encoder_2.
+  - encoder_2 receives a random galaxy from the same instrument as the anchor,
+    as a stand-in for real precomputed neighbors (see random_sameins below).
+  - lambda_geometric=0 matches the project default (see neighbours_train.py),
+    independent of encoder_2/sameins: the geometric loss only compares
+    encoder_1(target) against encoder_1(samegal counterpart).
 
 Run locally (single GPU, for a quick sanity check):
     python experiments/euclid-cosmos/train.py
