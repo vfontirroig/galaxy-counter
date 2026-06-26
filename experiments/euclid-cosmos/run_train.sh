@@ -12,4 +12,4 @@ set -euo pipefail
 
 source /n03data/fontirro/.galaxy-counter-env/bin/activate
 
-python /n03data/fontirro/galaxy-counter/experiments/euclid-cosmos/train.py
+python3 /n03data/fontirro/galaxy-counter/experiments/euclid-cosmos/train.py
