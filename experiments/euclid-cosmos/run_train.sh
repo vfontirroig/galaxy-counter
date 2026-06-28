@@ -8,6 +8,7 @@
 #SBATCH --gres=gpu:RTX8000:1        # request 1 RTX8000 GPU specifically
 #SBATCH --time=1-00:00:00
 #SBATCH --partition=compl      # change to your GPU partition
+#SBATCH --chdir=/n03data/fontirro/galaxy-counter
 set -euo pipefail
 
 source /n03data/fontirro/.galaxy-counter-env/bin/activate
