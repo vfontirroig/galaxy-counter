@@ -14,6 +14,11 @@ set -euo pipefail
 source /n03data/fontirro/.galaxy-counter-env/bin/activate
 
 echo "=== DIAGNOSTIC ==="
+echo "VIRTUAL_ENV=${VIRTUAL_ENV:-<unset>}"
+echo "PATH=$PATH"
+echo "command -v python3: $(command -v python3)"
+echo "--- contents of venv bin/ (python*) ---"
+ls -la /n03data/fontirro/.galaxy-counter-env/bin/ | grep -i python || true
 python3 -c "import sys, os; print('executable:', sys.executable); print('realpath:', os.path.realpath(sys.executable))" || true
 echo "--- sys.path ---"
 python3 -c "import sys; [print(p) for p in sys.path]" || true
