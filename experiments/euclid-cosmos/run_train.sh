@@ -11,21 +11,9 @@
 #SBATCH --chdir=/n03data/fontirro/galaxy-counter
 set -euo pipefail
 
-source /n03data/fontirro/.galaxy-counter-env/bin/activate
-
-echo "=== DIAGNOSTIC ==="
-echo "VIRTUAL_ENV=${VIRTUAL_ENV:-<unset>}"
-echo "PATH=$PATH"
-echo "command -v python3: $(command -v python3)"
-echo "--- contents of venv bin/ (python*) ---"
-ls -la /n03data/fontirro/.galaxy-counter-env/bin/ | grep -i python || true
-python3 -c "import sys, os; print('executable:', sys.executable); print('realpath:', os.path.realpath(sys.executable))" || true
-echo "--- sys.path ---"
-python3 -c "import sys; [print(p) for p in sys.path]" || true
-echo "--- ls via /n03data path ---"
-ls -la /n03data/fontirro/.galaxy-counter-env/lib/python3.12/site-packages/torch 2>&1 | head -5 || true
-echo "--- ls via /automnt/n03data path ---"
-ls -la /automnt/n03data/fontirro/.galaxy-counter-env/lib/python3.12/site-packages/torch 2>&1 | head -5 || true
-echo "=== END DIAGNOSTIC ==="
-
-python3 /n03data/fontirro/galaxy-counter/experiments/euclid-cosmos/train.py
+# Don't `source .../activate` — the venv's activate script bakes in the
+# automounter-canonicalized `/automnt/n03data/...` prefix, which is
+# unreachable from compute nodes and silently falls through PATH to the
+# system platform-python instead. Call the venv's python3 directly via the
+# working /n03data/... path so it resolves the venv's own site-packages.
+/n03data/fontirro/.galaxy-counter-env/bin/python3 /n03data/fontirro/galaxy-counter/experiments/euclid-cosmos/train.py
