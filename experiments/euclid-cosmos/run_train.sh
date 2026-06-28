@@ -11,6 +11,8 @@
 #SBATCH --chdir=/n03data/fontirro/galaxy-counter
 set -euo pipefail
 
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+
 # Don't `source .../activate` — the venv's activate script bakes in the
 # automounter-canonicalized `/automnt/n03data/...` prefix, which is
 # unreachable from compute nodes and silently falls through PATH to the
