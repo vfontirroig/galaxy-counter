@@ -13,4 +13,14 @@ set -euo pipefail
 
 source /n03data/fontirro/.galaxy-counter-env/bin/activate
 
+echo "=== DIAGNOSTIC ==="
+python3 -c "import sys, os; print('executable:', sys.executable); print('realpath:', os.path.realpath(sys.executable))" || true
+echo "--- sys.path ---"
+python3 -c "import sys; [print(p) for p in sys.path]" || true
+echo "--- ls via /n03data path ---"
+ls -la /n03data/fontirro/.galaxy-counter-env/lib/python3.12/site-packages/torch 2>&1 | head -5 || true
+echo "--- ls via /automnt/n03data path ---"
+ls -la /automnt/n03data/fontirro/.galaxy-counter-env/lib/python3.12/site-packages/torch 2>&1 | head -5 || true
+echo "=== END DIAGNOSTIC ==="
+
 python3 /n03data/fontirro/galaxy-counter/experiments/euclid-cosmos/train.py
