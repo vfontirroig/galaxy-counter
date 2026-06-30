@@ -143,8 +143,6 @@ def main():
     print("\nDataset loading...")
     dataset = EuclidCosmosDataset(H5_PATH)
     print(f"  Dataset size: {len(dataset)}")
-    print(dataset)
-
 
     #for only one galaxy sample, we can do:
     anchor, input, meta = dataset[0]

@@ -106,8 +106,7 @@ class EuclidCosmosModel(ConditionalFlowMatchingModule):
             for i in range(n):
                 for j, img in enumerate([cond[i], generated[i], target[i]]):
                     arr = img.squeeze().cpu().float().numpy()
-                    vmin, vmax = np.percentile(arr, [1, 99])
-                    axes[i, j].imshow(arr, cmap="gray", vmin=vmin, vmax=vmax)
+                    axes[i, j].imshow(arr, cmap="gray")
                     axes[i, j].axis("off")
 
             tag = dir_label.replace(" ", "").replace("→", "-")
@@ -122,7 +121,7 @@ class EuclidCosmosModel(ConditionalFlowMatchingModule):
 # CONFIG — edit before running
 # ---------------------------------------------------------------------------
 H5_PATH     = "/n03data/fontirro/data_files/euclid_cosmos_pairs_v3.h5"
-CKPT_DIR    = "/n03data/fontirro/checkpoints/euclid-cosmos-vis-f150w/test-phase1"  # where to save checkpoints and logs
+CKPT_DIR    = "/n03data/fontirro/checkpoints/euclid-cosmos-vis-f150w/test-2-phase1"  # where to save checkpoints and logs
 
 BATCH_SIZE  = 64
 NUM_WORKERS = 16
@@ -164,6 +163,9 @@ def random_sameins(anchor: torch.Tensor, instrument: torch.Tensor) -> torch.Tens
 
 def collate_fn(batch):
     """
+    arggs:
+    batch: list of tuples (anchor, cond, metadata) from the dataset. Each anchor and cond have shape (1, H_SIZE, W_SIZE) and metadata is a dict with keys "idx" and "anchor_survey".
+
     Builds the 5-tuple the model expects:
       (anchor, samegal, sameins, masks, metadata)
 
@@ -171,7 +173,7 @@ def collate_fn(batch):
     dataset: even indices → Euclid anchor, odd indices → COSMOS anchor.
     """
     anchor = torch.stack([b[0] for b in batch])   # (B, 1, H, W)
-    cond   = torch.stack([b[1] for b in batch])   # (B, 1, H, W) samegal counterpart
+    cond   = torch.stack([b[1] for b in batch])   # (B, 1, H, W) samegal counterpart (i.e the input)
     B = anchor.shape[0]
     metadata = [b[2] for b in batch]
 
@@ -186,7 +188,7 @@ def collate_fn(batch):
 def main():
     pl.seed_everything(42, workers=True)
 
-    dataset   = EuclidCosmosDataset(H5_PATH, bidirectional=True) #returns euclid (anchor), cosmos (input), metadata or cosmos (anchor), euclid (input), metadata depending on the index.
+    dataset   = EuclidCosmosDataset(H5_PATH, bidirectional=True) #returns ]euclid (anchor), cosmos (input), metadata or cosmos (anchor), euclid (input), metadata depending on the index.
     n_total   = len(dataset)
     n_test    = int(n_total * TEST_RATIO)
     n_val     = int(n_total * VAL_RATIO)
