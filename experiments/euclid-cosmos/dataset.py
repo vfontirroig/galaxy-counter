@@ -76,7 +76,7 @@ class EuclidCosmosDataset(Dataset):
         cos = torch.from_numpy(self.file["cosmos_images_downscaled"][idx].copy())
 
         euc_mean, euc_std = self.norm_dict["euclid_up"]
-        cos_mean, cos_std = self.norm_dict["cosmos_ds"]  # using same stats for both COSMOS bands
+        cos_mean, cos_std = self.norm_dict["cosmos_ds"] 
         euc = (euc - euc_mean) / euc_std
         cos = (cos - cos_mean) / cos_std
 
@@ -133,24 +133,29 @@ def main():
 
     H5_PATH = "/n03data/fontirro/data_files/euclid_cosmos_pairs_v3.h5"
 
-    print("Computing normalization stats...")
-    stats = compute_norm_stats(H5_PATH)
+    #print("Computing normalization stats...")
+    #stats = compute_norm_stats(H5_PATH)
     
-    print("\nTesting dataset loading...")
+    print("\nDataset loading...")
     dataset = EuclidCosmosDataset(H5_PATH)
     print(f"  Dataset size: {len(dataset)}")
-    euc, cos, meta = dataset[0]
-    print(f"  Euclid shape: {euc.shape}, range [{euc.min():.3f}, {euc.max():.3f}]")
-    print(f"  COSMOS shape: {cos.shape}, range [{cos.min():.3f}, {cos.max():.3f}]")
-    print(f" Euclid mean/std: {euc.mean():.5f} / {euc.std():.5f}")
-    print(f" COSMOS mean/std: {cos.mean():.5f} / {cos.std():.5f}")
+    input, cos, meta = dataset[0]
+    print(f"  Sample idx: {meta['idx']}, anchor survey: {meta['anchor_survey']}")
+    print(f"  Dataset shape: {dataset.shape}")
+    print(dataset[0])
+    
+    
+    # print(f"  Euclid shape: {input.shape}, range [{input.min():.3f}, {input.max():.3f}]")
+    # print(f"  COSMOS shape: {cos.shape}, range [{cos.min():.3f}, {cos.max():.3f}]")
+    # print(f" Euclid mean/std: {input.mean():.5f} / {input.std():.5f}")
+    # print(f" COSMOS mean/std: {cos.mean():.5f} / {cos.std():.5f}")
    
-    loader = DataLoader(dataset, batch_size=32, shuffle=True,
-                        num_workers=2, collate_fn=collate_pairs,
-                        persistent_workers=True)
-    euc_batch, cos_batch, _ = next(iter(loader))
-    print(f"\n  Batch — Euclid: {euc_batch.shape}, COSMOS: {cos_batch.shape}")
-    print("Done.")
+    # loader = DataLoader(dataset, batch_size=64, shuffle=True,
+    #                     num_workers=2, collate_fn=collate_pairs,
+    #                     persistent_workers=True)
+    # euc_batch, cos_batch, _ = next(iter(loader))
+    # print(f"\n  Batch — Euclid: {euc_batch.shape}, COSMOS: {cos_batch.shape}")
+    # print("Done.")
 
 
 if __name__ == "__main__":

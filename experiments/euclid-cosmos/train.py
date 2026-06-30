@@ -124,12 +124,12 @@ class EuclidCosmosModel(ConditionalFlowMatchingModule):
 H5_PATH     = "/n03data/fontirro/data_files/euclid_cosmos_pairs_v3.h5"
 CKPT_DIR    = "/n03data/fontirro/checkpoints/euclid-cosmos-vis-f150w/test-phase1"  # where to save checkpoints and logs
 
-BATCH_SIZE  = 8
+BATCH_SIZE  = 64
 NUM_WORKERS = 16
 VAL_RATIO   = 0.05
 TEST_RATIO  = 0.001
 NUM_STEPS   = 200_000
-IMAGE_SIZE  = 40      #Euclid cutout spatial size
+IMAGE_SIZE  = 64      #Cutout spatial size
 LR          = 1e-4    #learning rate for AdamW optimizer
 
 N_GPUS      = 1       #set to number of GPUs on the node
@@ -186,7 +186,7 @@ def collate_fn(batch):
 def main():
     pl.seed_everything(42, workers=True)
 
-    dataset   = EuclidCosmosDataset(H5_PATH, bidirectional=True)
+    dataset   = EuclidCosmosDataset(H5_PATH, bidirectional=True) #returns euclid (anchor), cosmos (input), metadata or cosmos (anchor), euclid (input), metadata depending on the index.
     n_total   = len(dataset)
     n_test    = int(n_total * TEST_RATIO)
     n_val     = int(n_total * VAL_RATIO)
