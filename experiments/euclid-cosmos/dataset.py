@@ -143,12 +143,14 @@ def main():
     print("\nDataset loading...")
     dataset = EuclidCosmosDataset(H5_PATH)
     print(f"  Dataset size: {len(dataset)}")
-    input, cos, meta = dataset[0]
-    print(cos)
-    print(input)
-    print(meta)
-    print(f"  Sample idx: {meta['idx']}, anchor survey: {meta['anchor_survey']}")
-    print(dataset[0])
+    anchor, input, meta = dataset[0]
+    print(f"  Anchor: {anchor}")
+    print(f"  Anchor shape: {anchor.shape}")
+    print(f"  Input: {input}")
+    print(f"  Input shape: {input.shape}")
+    print(f"  Metadata: {meta}")
+    #print(f"  Sample idx: {meta['idx']}, anchor survey: {meta['anchor_survey']}")
+    print(f"  Dataset[0]: {dataset[0]}")
     
     
     # print(f"  Euclid shape: {input.shape}, range [{input.min():.3f}, {input.max():.3f}]")
