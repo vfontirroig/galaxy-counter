@@ -90,7 +90,7 @@ class EuclidCosmosDataset(Dataset):
             anchor, cond, survey = euc, cos, "euclid"
 
         metadata = {"idx": idx, "anchor_survey": survey}
-        return anchor, cond, metadata
+        return anchor, cond, metadata #anchor and cond have shape (1, H_SIZE, W_SIZE) and metadata is a dict with keys "idx" and "anchor_survey"
 
 
 def collate_pairs(batch):
@@ -143,6 +143,10 @@ def main():
     print("\nDataset loading...")
     dataset = EuclidCosmosDataset(H5_PATH)
     print(f"  Dataset size: {len(dataset)}")
+    print(dataset)
+
+
+    #for only one galaxy sample, we can do:
     anchor, input, meta = dataset[0]
     print(f"  Anchor: {anchor}")
     print(f"  Anchor shape: {anchor.shape}")
@@ -150,7 +154,7 @@ def main():
     print(f"  Input shape: {input.shape}")
     print(f"  Metadata: {meta}")
     #print(f"  Sample idx: {meta['idx']}, anchor survey: {meta['anchor_survey']}")
-    print(f"  Dataset[0]: {dataset[0]}")
+    print(f"  Dataset: {dataset[0]}")
     
     
     # print(f"  Euclid shape: {input.shape}, range [{input.min():.3f}, {input.max():.3f}]")
