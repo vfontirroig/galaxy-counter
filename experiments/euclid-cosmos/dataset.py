@@ -131,7 +131,7 @@ def compute_norm_stats(hdf5_path: str, n_samples: int = 10_000) -> dict:
 def main():
     from torch.utils.data import DataLoader
 
-    H5_PATH = "/n03data/fontirro/data_files/euclid_cosmos_pairs_v3.h5"
+    H5_PATH = "/n03data/fontirro/data_files/euclid_cosmos_test_pairs.h5"
 
     #print("Computing normalization stats...")
     #stats = compute_norm_stats(H5_PATH)
@@ -140,8 +140,10 @@ def main():
     dataset = EuclidCosmosDataset(H5_PATH)
     print(f"  Dataset size: {len(dataset)}")
     input, cos, meta = dataset[0]
+    print(cos)
+    print(input)
+    print(meta)
     print(f"  Sample idx: {meta['idx']}, anchor survey: {meta['anchor_survey']}")
-    print(f"  Dataset size: {len(dataset)}")
     print(dataset[0])
     
     
