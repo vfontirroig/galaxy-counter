@@ -26,6 +26,10 @@ Usage:
     # cosmos_imgs: (B, 1, H_SIZE, W_SIZE)  ← both match eachother in size.
 """
 
+import os
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+
 import h5py
 import numpy as np
 import torch
