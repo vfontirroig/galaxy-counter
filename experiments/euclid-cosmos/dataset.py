@@ -141,7 +141,7 @@ def main():
     print(f"  Dataset size: {len(dataset)}")
     input, cos, meta = dataset[0]
     print(f"  Sample idx: {meta['idx']}, anchor survey: {meta['anchor_survey']}")
-    print(f"  Dataset shape: {dataset.shape}")
+    print(f"  Dataset size: {len(dataset)}")
     print(dataset[0])
     
     
