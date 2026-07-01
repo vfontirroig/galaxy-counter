@@ -65,7 +65,7 @@ class EuclidCosmosModel(ConditionalFlowMatchingModule):
     def validation_step(self, batch, batch_idx):
         if self._fixed_val_batch is None and batch_idx == 0:
             anchor, cond, sameins, masks, metadata = batch
-            n = min(8, anchor.shape[0])
+            n = anchor.shape[0]
             self._fixed_val_batch = (
                 anchor[:n].detach().clone(),
                 cond[:n].detach().clone(),
@@ -95,7 +95,7 @@ class EuclidCosmosModel(ConditionalFlowMatchingModule):
         }
 
         for survey, (dir_label, t0, t1, t2) in direction_cfg.items():
-            idx = [i for i, s in enumerate(surveys) if s == survey]
+            idx = [i for i, s in enumerate(surveys) if s == survey][:8]
             if not idx:
                 continue
 
