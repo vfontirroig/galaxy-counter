@@ -111,7 +111,7 @@ def main():
     #print(f"Columns: {list(catalog.columns)}")
 
     mask = (catalog[EUCLID_EXISTS_COL] == 1) & (catalog[COSMOS_EXISTS_COL] == 1)
-    catalog = catalog[mask]
+    catalog = catalog[mask].reset_index(drop=True)
     print(f"Pairs with both cutouts present: {len(catalog)} / {len(mask)}")
 
     euclid_paths = [os.path.join(EUCLID_DIR_PATH, p) for p in catalog[EUCLID_COL]]
@@ -135,8 +135,9 @@ def main():
             total=N, desc="Scanning", mininterval=5,
         ))
     valid = [zf < 0.10 for zf in zero_fracs]
-    euclid_paths     = [p for p, v in zip(euclid_paths, valid) if v]
+    euclid_paths = [p for p, v in zip(euclid_paths, valid) if v]
     cosmos_paths = [p for p, v in zip(cosmos_paths, valid) if v]
+    catalog      = catalog[valid].reset_index(drop=True)
     N_valid = len(euclid_paths)
     print(f"Valid pairs after filtering: {N_valid}/{N}  ({N - N_valid} skipped, zero_frac >= 10%)")
 
@@ -183,6 +184,7 @@ def main():
 
         kept_euclid_paths = []
         kept_cosmos_paths = []
+        kept_cat_indices  = []
         write_idx = 0
         skipped = 0
         with ProcessPoolExecutor(max_workers=NUM_WORKERS) as executor:
@@ -199,6 +201,7 @@ def main():
                 euc_up_ds[write_idx] = euc_up
                 kept_euclid_paths.append(euclid_paths[i])
                 kept_cosmos_paths.append(cosmos_paths[i])
+                kept_cat_indices.append(i)
                 write_idx += 1
 
         N_final = write_idx
@@ -212,6 +215,15 @@ def main():
         dt = h5py.string_dtype()
         cat_grp.create_dataset("euclid_paths", data=np.array(kept_euclid_paths, dtype=object), dtype=dt)
         cat_grp.create_dataset("cosmos_paths", data=np.array(kept_cosmos_paths, dtype=object), dtype=dt)
+
+        kept_catalog = catalog.iloc[kept_cat_indices].reset_index(drop=True)
+        feat_grp = cat_grp.create_group("features")
+        for col in kept_catalog.columns:
+            vals = kept_catalog[col]
+            try:
+                feat_grp.create_dataset(col, data=vals.to_numpy(dtype=np.float32, na_value=np.nan))
+            except (ValueError, TypeError):
+                feat_grp.create_dataset(col, data=np.array(vals.astype(str).tolist(), dtype=object), dtype=dt)
         f.attrs["num_pairs"] = N_final
         f.attrs["num_channels"] = 1
         f.attrs["euclid_shape"] = [H_euc, W_euc]

@@ -64,13 +64,14 @@ class EuclidCosmosModel(ConditionalFlowMatchingModule):
 
     def validation_step(self, batch, batch_idx):
         if self._fixed_val_batch is None and batch_idx == 0:
-            euclid, cosmos, sameins, masks, _ = batch
+            euclid, cosmos, sameins, masks, metadata = batch
             n = min(8, euclid.shape[0])
             self._fixed_val_batch = (
                 euclid[:n].detach().clone(),
                 cosmos[:n].detach().clone(),
                 sameins[:n].detach().clone(),
                 masks[:n].detach().clone(),
+                [m["idx"] for m in metadata[:n]],
             )
         return super().validation_step(batch, batch_idx)
 
@@ -78,7 +79,7 @@ class EuclidCosmosModel(ConditionalFlowMatchingModule):
         if self._fixed_val_batch is None or self.sample_dir is None:
             return
 
-        euclid, cosmos, _, masks = [t.to(self.device) for t in self._fixed_val_batch]
+        euclid, cosmos, _, masks, galaxy_ids = (*[t.to(self.device) for t in self._fixed_val_batch[:4]], self._fixed_val_batch[4])
         os.makedirs(self.sample_dir, exist_ok=True)
         step = self.trainer.global_step
         n = euclid.shape[0]
@@ -108,6 +109,8 @@ class EuclidCosmosModel(ConditionalFlowMatchingModule):
                     arr = img.squeeze().cpu().float().numpy()
                     axes[i, j].imshow(arr, cmap="gray")
                     axes[i, j].axis("off")
+                axes[i, 0].set_ylabel(f"id={galaxy_ids[i]}", fontsize=7, rotation=0,
+                                      labelpad=30, va="center", color="magenta")
 
             tag = dir_label.replace(" ", "").replace("→", "-")
             fig.suptitle(f"{dir_label}  |  step {step}", fontsize=10)
