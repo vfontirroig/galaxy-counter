@@ -6,7 +6,7 @@
 #SBATCH --cpus-per-task=16       # matches NUM_WORKERS in train.py
 #SBATCH --mem=32G
 #SBATCH --gres=gpu:L40S:1
-#SBATCH --time=1-00:00:00
+#SBATCH --time=2-00:00:00
 #SBATCH --partition=pscompl      # change to your GPU partition
 #SBATCH --chdir=/n03data/fontirro/galaxy-counter
 set -euo pipefail
