@@ -42,7 +42,7 @@ COSMOS_DIR_PATH = "/n03data/fontirro/cutouts/cosmos/120_cutouts/f150w/"  # base 
 EUCLID_HDU = 1   # HDU index for Euclid data (usually 1 for science extension)
 COSMOS_HDU = 0   # HDU index for COSMOS data (usually 0)
 
-OUTPUT_H5 = "/n03data/fontirro/data_files/euclid_cosmos_test_pairs.h5"
+OUTPUT_H5 = "/n03data/fontirro/data_files/euclid_cosmos_pairs_v4.h5"
 
 NUM_WORKERS = 16  # parallel threads for loading + preprocessing
 
