@@ -110,7 +110,7 @@ class EuclidCosmosModel(ConditionalFlowMatchingModule):
                     axes[i, j].imshow(arr, cmap="gray")
                     axes[i, j].axis("off")
                 axes[i, 0].set_ylabel(f"id={galaxy_ids[i]}", fontsize=7, rotation=0,
-                                      labelpad=30, va="center", color="magenta")
+                                      labelpad=30, va="left", color="magenta")
 
             tag = dir_label.replace(" ", "").replace("→", "-")
             fig.suptitle(f"{dir_label}  |  step {step}", fontsize=10)
