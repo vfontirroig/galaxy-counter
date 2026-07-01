@@ -64,14 +64,15 @@ class EuclidCosmosModel(ConditionalFlowMatchingModule):
 
     def validation_step(self, batch, batch_idx):
         if self._fixed_val_batch is None and batch_idx == 0:
-            euclid, cosmos, sameins, masks, metadata = batch
-            n = min(8, euclid.shape[0])
+            anchor, cond, sameins, masks, metadata = batch
+            n = min(8, anchor.shape[0])
             self._fixed_val_batch = (
-                euclid[:n].detach().clone(),
-                cosmos[:n].detach().clone(),
+                anchor[:n].detach().clone(),
+                cond[:n].detach().clone(),
                 sameins[:n].detach().clone(),
                 masks[:n].detach().clone(),
                 [m["idx"] for m in metadata[:n]],
+                [m["anchor_survey"] for m in metadata[:n]],
             )
         return super().validation_step(batch, batch_idx)
 
@@ -79,23 +80,37 @@ class EuclidCosmosModel(ConditionalFlowMatchingModule):
         if self._fixed_val_batch is None or self.sample_dir is None:
             return
 
-        euclid, cosmos, _, masks, galaxy_ids = (*[t.to(self.device) for t in self._fixed_val_batch[:4]], self._fixed_val_batch[4])
+        anchor, cond, _, masks, galaxy_ids, surveys = (
+            *[t.to(self.device) for t in self._fixed_val_batch[:4]],
+            self._fixed_val_batch[4],
+            self._fixed_val_batch[5],
+        )
         os.makedirs(self.sample_dir, exist_ok=True)
         step = self.trainer.global_step
-        n = euclid.shape[0]
 
-        directions = [
-            ("COSMOS → Euclid", cosmos, euclid, "COSMOS input",  "Generated Euclid", "Real Euclid"),
-            ("Euclid → COSMOS", euclid, cosmos, "Euclid input",  "Generated COSMOS", "Real COSMOS"),
-        ]
+        # one plot per direction, containing only rows that match that direction
+        direction_cfg = {
+            "euclid": ("Euclid to COSMOS", "Euclid input", "Generated COSMOS", "Real COSMOS"),
+            "cosmos": ("COSMOS to Euclid", "COSMOS input", "Generated Euclid", "Real Euclid"),
+        }
 
-        for dir_label, cond, target, t0, t1, t2 in directions:
-            sameins = cond.unsqueeze(1)
+        for survey, (dir_label, t0, t1, t2) in direction_cfg.items():
+            idx = [i for i, s in enumerate(surveys) if s == survey]
+            if not idx:
+                continue
+
+            anc = anchor[idx]
+            con = cond[idx]
+            msk = masks[idx]
+            ids = [galaxy_ids[i] for i in idx]
+            n = len(idx)
+
+            sameins_vis = con.unsqueeze(1)
             with torch.no_grad():
                 generated = self.sample(
-                    cond_image_samegal=cond,
-                    cond_image_sameins=sameins,
-                    masks=masks,
+                    cond_image_samegal=con,
+                    cond_image_sameins=sameins_vis,
+                    masks=msk,
                     num_steps=self.n_val_steps,
                 )
 
@@ -105,17 +120,17 @@ class EuclidCosmosModel(ConditionalFlowMatchingModule):
             for j, title in enumerate([t0, t1, t2]):
                 axes[0, j].set_title(title, fontsize=9)
             for i in range(n):
-                for j, img in enumerate([cond[i], generated[i], target[i]]):
+                for j, img in enumerate([con[i], generated[i], anc[i]]):
                     arr = img.squeeze().cpu().float().numpy()
                     axes[i, j].imshow(arr, cmap="gray")
                     axes[i, j].axis("off")
-                axes[i, 0].text(0.02, 0.98, f"id={galaxy_ids[i]}", fontsize=30,
+                axes[i, 0].text(0.02, 0.98, f"id={ids[i]}", fontsize=7,
                                 ha="left", va="top", color="magenta",
                                 transform=axes[i, 0].transAxes)
 
-            tag = dir_label.replace(" ", "").replace("→", "-")
+            tag = dir_label.replace(" ", "").replace("to", "-")
             fig.suptitle(f"{dir_label}  |  step {step}", fontsize=10)
-            plt.tight_layout()
+            plt.tight_layout(rect=[0, 0, 1, 0.95])
             fname = os.path.join(self.sample_dir, f"{tag}_step={step:07d}.png")
             plt.savefig(fname, dpi=100, bbox_inches="tight")
             plt.close()
