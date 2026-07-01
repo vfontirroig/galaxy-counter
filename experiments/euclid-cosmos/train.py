@@ -123,7 +123,7 @@ class EuclidCosmosModel(ConditionalFlowMatchingModule):
 # ---------------------------------------------------------------------------
 # CONFIG — edit before running
 # ---------------------------------------------------------------------------
-H5_PATH     = "/n03data/fontirro/data_files/euclid_cosmos_pairs_v3.h5"
+H5_PATH     = "/n03data/fontirro/data_files/euclid_cosmos_pairs_v4.h5"
 CKPT_DIR    = "/n03data/fontirro/checkpoints/euclid-cosmos-vis-f150w/test-2-phase1"  # where to save checkpoints and logs
 
 BATCH_SIZE  = 64
