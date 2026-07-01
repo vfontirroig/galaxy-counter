@@ -109,7 +109,7 @@ class EuclidCosmosModel(ConditionalFlowMatchingModule):
                     arr = img.squeeze().cpu().float().numpy()
                     axes[i, j].imshow(arr, cmap="gray")
                     axes[i, j].axis("off")
-                axes[i, 0].text(0.02, 0.98, f"id={galaxy_ids[i]}", fontsize=7,
+                axes[i, 0].text(0.02, 0.98, f"id={galaxy_ids[i]}", fontsize=30,
                                 ha="left", va="top", color="magenta",
                                 transform=axes[i, 0].transAxes)
 
