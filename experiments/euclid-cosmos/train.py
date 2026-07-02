@@ -205,6 +205,9 @@ def collate_fn(batch):
 
 
 def main():
+    torch.backends.cuda.matmul.allow_tf32 = True
+    torch.backends.cudnn.allow_tf32 = True
+    torch.backends.cudnn.benchmark = True
     pl.seed_everything(42, workers=True)
 
     dataset   = EuclidCosmosDataset(H5_PATH, bidirectional=True) #returns ]euclid (anchor), cosmos (input), metadata or cosmos (anchor), euclid (input), metadata depending on the index.
@@ -231,6 +234,7 @@ def main():
         collate_fn=collate_fn,
         persistent_workers=NUM_WORKERS > 0,
         pin_memory=True,
+        prefetch_factor=4 if NUM_WORKERS > 0 else None,
         drop_last=True,
     )
     val_loader = DataLoader(
@@ -241,6 +245,7 @@ def main():
         collate_fn=collate_fn,
         persistent_workers=NUM_WORKERS > 0,
         pin_memory=True,
+        prefetch_factor=4 if NUM_WORKERS > 0 else None,
     )
 
     model = EuclidCosmosModel(
@@ -261,6 +266,8 @@ def main():
         lambda_geometric=0.0,     # no neighbors yet → geometric loss disabled
         mask_center=False,
     )
+
+    model = torch.compile(model, mode="max-autotune")
 
     csv_logger = CSVLogger(save_dir=CKPT_DIR, name="logs")
 
