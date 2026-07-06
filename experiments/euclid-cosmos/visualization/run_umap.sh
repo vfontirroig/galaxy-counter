@@ -11,11 +11,11 @@ set -euo pipefail
 
 source /n03data/fontirro/.galaxy-counter-env/bin/activate
 
-CKPT_DIR="/n03data/fontirro/checkpoints/euclid-cosmos-phase1-v2"
+CKPT_DIR="/n03data/fontirro/checkpoints/euclid-cosmos-vis-f150w/test-4-phase1"
 
 python /n03data/fontirro/galaxy-counter/experiments/euclid-cosmos/visualization/umap_latent.py \
-    --checkpoint "${CKPT_DIR}/best-epoch=37-step=175000.ckpt" \
-    --h5         "/n03data/fontirro/data_files/euclid_cosmos_pairs.h5" \
-    --out        "/n03data/fontirro/plots_model/euclid-cosmos-phase1-v2/umap_val.png" \
-    --out-cutouts "/n03data/fontirro/plots_model/euclid-cosmos-phase1-v2/umap_val_cutouts.png" \
+    --checkpoint "${CKPT_DIR}/best-epoch=218-step=195000.ckpt" \
+    --h5         "/n03data/fontirro/data_files/euclid_cosmos_pairs_vis_f150w.h5" \
+    --out        "/n03data/fontirro/plots_model/euclid-cosmos-vis-f150w/test-4-phase1/umap_val.png" \
+    --out-cutouts "/n03data/fontirro/plots_model/euclid-cosmos-vis-f150w/test-4-phase1/umap_val_cutouts.png" \
     --indices    "${CKPT_DIR}/val_indices.npy"

@@ -10,10 +10,10 @@ Figure columns depend on direction:
 
 Usage:
     python experiments/euclid-cosmos/testing.py \
-        --checkpoint /n03data/fontirro/checkpoints/euclid-cosmos-vis-f115w/test-1-phase1/best-epoch=00-step=100000.ckpt \
-        --h5         /n03data/fontirro/data_files/euclid_cosmos_pairs_vis_f115w.h5 \
-        --indices    /n03data/fontirro/checkpoints/euclid-cosmos-vis-f115w/test-1-phase1/test_indices.npy \
-        --out        /n03data/fontirro/checkpoints/euclid-cosmos-vis-f115w/test-1-phase1/test_results.png \
+        --checkpoint /n03data/fontirro/checkpoints/euclid-cosmos-vis-f150w/test-4-phase1/best-epoch=00-step=100000.ckpt \
+        --h5         /n03data/fontirro/data_files/euclid_cosmos_pairs_vis_f150w.h5 \
+        --indices    /n03data/fontirro/checkpoints/euclid-cosmos-vis-f150w/test-4-phase1/test_indices.npy \
+        --out        /n03data/fontirro/checkpoints/euclid-cosmos-vis-f150w/test-4-phase1/test_results.png \
         --direction  cosmos-to-euclid
 """
 
