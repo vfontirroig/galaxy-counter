@@ -164,10 +164,22 @@ def main():
 
     ax2.scatter(euc_u2[:, 0], euc_u2[:, 1], c="steelblue",  label="Euclid VIS", **kw)
     ax2.scatter(cos_u2[:, 0], cos_u2[:, 1], c="darkorange", label="COSMOS F115W", **kw)
+
+    for k, (pid, color) in enumerate(zip(pair_ids, pair_colors)):
+        label = str(k + 1)
+        ax2.scatter(euc_u2[pid, 0], euc_u2[pid, 1], s=80, color=color,
+                    marker="*", edgecolors="black", linewidths=0.4, zorder=5)
+        ax2.scatter(cos_u2[pid, 0], cos_u2[pid, 1], s=80, color=color,
+                    marker="*", edgecolors="black", linewidths=0.4, zorder=5)
+        for x, y in [(euc_u2[pid, 0], euc_u2[pid, 1]),
+                     (cos_u2[pid, 0], cos_u2[pid, 1])]:
+            ax2.annotate(label, xy=(x, y), xytext=(4, 4), textcoords="offset points",
+                         fontsize=7, color=color, fontweight="bold")
+
     ax2.set_title("encoder_2 — same-instrument\nSurveys may separate")
     ax2.set_xlabel("UMAP 1")
     ax2.set_ylabel("UMAP 2")
-    ax2.legend(markerscale=3)
+    ax2.legend(handles=legend_handles, fontsize=8)
 
     fig.suptitle(f"Latent space UMAP  |  N = {N} galaxy pairs", fontsize=11)
     plt.tight_layout()
