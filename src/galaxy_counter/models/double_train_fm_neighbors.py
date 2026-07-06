@@ -180,11 +180,18 @@ class ConditionalFlowMatchingModule(pl.LightningModule):
                 attention_head_dim=attention_head_dim,
             )
 
-        # Compile only the heavy conv net; the rest of this module is Python-heavy
-        # control flow (branching, metadata handling, side-effect state for logging)
-        # that torch.compile + CUDA graphs handles poorly when wrapped around the
-        # whole LightningModule.
-        self.velocity_model = torch.compile(self.velocity_model, mode="max-autotune")
+        # Keep self.velocity_model as the plain eager module so checkpoint keys
+        # stay stable (velocity_model.<param>) regardless of compile settings.
+        # The compiled callable (used only for the training forward pass, see
+        # forward()) wraps the *same* underlying module/parameters, so we stash
+        # it via object.__setattr__ to keep nn.Module from registering it as a
+        # second submodule — that would duplicate every UNet parameter under a
+        # second set of keys in state_dict() (which, unlike .parameters(), does
+        # not dedupe shared tensors across registered submodules).
+        object.__setattr__(
+            self, "_velocity_model_compiled",
+            torch.compile(self.velocity_model, mode="max-autotune"),
+        )
 
         # Initialize geometric loss function once (reused across all training steps)
         if self.lambda_geometric > 0:
@@ -241,7 +248,7 @@ class ConditionalFlowMatchingModule(pl.LightningModule):
         # at varying, smaller batch sizes under no_grad; sending those through
         # the compiled path forces a fresh AUTOTUNE + CUDA-graph pool per shape,
         # which piles up host/device memory over the course of training.
-        velocity_model = self.velocity_model if self.training else self.velocity_model._orig_mod
+        velocity_model = self._velocity_model_compiled if self.training else self.velocity_model
 
         return velocity_model(
             x_t,
