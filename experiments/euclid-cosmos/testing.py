@@ -3,17 +3,17 @@ Test the trained Euclid x COSMOS flow-matching model on the held-out test set.
 
 Loads the test indices saved by train.py, generates images, and reports MSE.
 Figure columns depend on direction:
-  cosmos-to-euclid (default, trained direction):
+  cosmos-to-euclid:
       [COSMOS input | Generated Euclid | Real Euclid]
-  euclid-to-cosmos (reverse, not trained for this — expect poor results):
+  euclid-to-cosmos:
       [Euclid input | Generated COSMOS | Real COSMOS]
 
 Usage:
     python experiments/euclid-cosmos/testing.py \
-        --checkpoint /n03data/fontirro/checkpoints/euclid-cosmos-phase1/best-epoch=00-step=100000.ckpt \
-        --h5         /n03data/fontirro/data_files/euclid_cosmos_pairs.h5 \
-        --indices    /n03data/fontirro/checkpoints/euclid-cosmos-phase1/test_indices.npy \
-        --out        /n03data/fontirro/checkpoints/euclid-cosmos-phase1/test_results.png \
+        --checkpoint /n03data/fontirro/checkpoints/euclid-cosmos-vis-f115w/test-1-phase1/best-epoch=00-step=100000.ckpt \
+        --h5         /n03data/fontirro/data_files/euclid_cosmos_pairs_vis_f115w.h5 \
+        --indices    /n03data/fontirro/checkpoints/euclid-cosmos-vis-f115w/test-1-phase1/test_indices.npy \
+        --out        /n03data/fontirro/checkpoints/euclid-cosmos-vis-f115w/test-1-phase1/test_results.png \
         --direction  cosmos-to-euclid
 """
 
@@ -38,8 +38,7 @@ from train import EuclidCosmosModel, collate_fn
 
 def show_image(ax, img_tensor, title=None):
     img = img_tensor.squeeze().cpu().float().numpy()
-    vmin, vmax = np.percentile(img, [1, 99])
-    ax.imshow(img, cmap="gray", vmin=vmin, vmax=vmax)
+    ax.imshow(img, cmap="gray")
     if title:
         ax.set_title(title, fontsize=9)
     ax.axis("off")
@@ -53,8 +52,8 @@ def main():
     p.add_argument("--out",        default="test_results.png")
     p.add_argument("--direction",  default="cosmos-to-euclid",
                    choices=["cosmos-to-euclid", "euclid-to-cosmos"],
-                   help="cosmos-to-euclid: trained direction. "
-                        "euclid-to-cosmos: reverse (not trained, expect poor results).")
+                   help="cosmos-to-euclid: COSMOS input, generate Euclid"
+                        "euclid-to-cosmos: Euclid input, generate COSMOS")
     p.add_argument("--n-plot",     type=int, default=8,   help="Galaxy rows to show in figure")
     p.add_argument("--batch-size", type=int, default=64)
     p.add_argument("--num-steps",  type=int, default=100, help="ODE integration steps")
@@ -70,8 +69,6 @@ def main():
         print("  WARNING: no GPU found, running on CPU (will be slow)")
 
     print(f"Direction: {args.direction}")
-    if args.direction == "euclid-to-cosmos":
-        print("  NOTE: model was trained cosmos-to-euclid — reverse results may be poor.")
 
     # --- Load model ---
     print(f"Loading checkpoint: {args.checkpoint}")
@@ -92,27 +89,49 @@ def main():
         collate_fn=collate_fn,
     )
 
+    # --- Build a same-instrument neighbor pool from the whole test set ---
+    # Sampling within-batch (as train.py's collate_fn does) breaks when a
+    # batch has only one row (e.g. the last, leftover batch): there'd be no
+    # "different" galaxy to pick, and the anchor would leak into its own
+    # conditioning. Sampling from the full test set avoids that entirely.
+    print("Building same-instrument neighbor pool from the full test set...")
+    pool_imgs = []
+    for idx in test_indices.tolist():
+        euc, cos, _ = dataset[idx]
+        pool_imgs.append(euc if args.direction == "cosmos-to-euclid" else cos)
+    sameins_pool = torch.stack(pool_imgs) #images of the same instrument as the anchor.
+    n_pool = sameins_pool.shape[0] #number of same-instrument galaxies.
+
     # --- Run inference over the full test set ---
     all_mse = []
     plot_input, plot_generated, plot_target = [], [], []
 
     print("Running inference...")
+    offset = 0
     with torch.no_grad():
-        for batch_idx, (euclid_real, cosmos, sameins, masks, _) in enumerate(loader):
-            euclid_real = euclid_real.to(device)
-            cosmos      = cosmos.to(device)
-            sameins     = sameins.to(device)
-            masks       = masks.to(device)
+        for batch_idx, (euclid, cosmos, _, masks, _) in enumerate(loader):
+            euclid = euclid.to(device)
+            cosmos = cosmos.to(device)
+            masks  = masks.to(device)
+            B      = euclid.shape[0] 
 
             if args.direction == "cosmos-to-euclid":
-                cond    = cosmos
-                target  = euclid_real
+                anchor, cond = euclid, cosmos
             else:
-                # Reverse: condition on Euclid, try to generate COSMOS.
-                # sameins is rebuilt as a (B,1,1,H,W) dummy from the new cond.
-                cond    = euclid_real
-                target  = cosmos
-                sameins = euclid_real.unsqueeze(1)
+                anchor, cond = cosmos, euclid
+
+            # sameins: a different galaxy of the same instrument as the
+            # anchor (what's being generated), drawn from the full test
+            # set — mirrors train.py's collate_fn, minus the batch-size
+            # dependency.
+            if n_pool > 1:
+                row_pos    = torch.arange(offset, offset + B)
+                rand_local = torch.randint(0, n_pool - 1, (B,))
+                rand_idx   = rand_local + (rand_local >= row_pos)
+                sameins    = sameins_pool[rand_idx].unsqueeze(1).to(device)
+            else:
+                sameins = anchor.unsqueeze(1)
+            offset += B
 
             generated = model.sample(
                 cond_image_samegal=cond,
@@ -121,13 +140,13 @@ def main():
                 num_steps=args.num_steps,
             )
 
-            mse = ((generated - target) ** 2).mean(dim=(1, 2, 3))
+            mse = ((generated - anchor) ** 2).mean(dim=(1, 2, 3))
             all_mse.append(mse.cpu())
 
             if batch_idx == 0:
                 plot_input     = cond.cpu()
                 plot_generated = generated.cpu()
-                plot_target    = target.cpu()
+                plot_target    = anchor.cpu()
 
     all_mse = torch.cat(all_mse)
     print(f"\n=== Test Results ({args.direction}) ===")
