@@ -142,9 +142,9 @@ def main():
 
     for k, (pid, color) in enumerate(zip(pair_ids, pair_colors)):
         label = str(k + 1)
-        ax1.scatter(euc_u1[pid, 0], euc_u1[pid, 1], s=80, color=color,
+        ax1.scatter(euc_u1[pid, 0], euc_u1[pid, 1], s=144, color=color,
                     marker="*", edgecolors="black", linewidths=0.4, zorder=5)
-        ax1.scatter(cos_u1[pid, 0], cos_u1[pid, 1], s=80, color=color,
+        ax1.scatter(cos_u1[pid, 0], cos_u1[pid, 1], s=144, color=color,
                     marker="*", edgecolors="black", linewidths=0.4, zorder=5)
         for x, y in [(euc_u1[pid, 0], euc_u1[pid, 1]),
                      (cos_u1[pid, 0], cos_u1[pid, 1])]:
@@ -154,7 +154,7 @@ def main():
     legend_handles = [
         Line2D([0], [0], marker="o", color="w", markerfacecolor="steelblue",  markersize=6, label="Euclid VIS"),
         Line2D([0], [0], marker="o", color="w", markerfacecolor="darkorange", markersize=6, label="COSMOS F115W"),
-        Line2D([0], [0], marker="*", color="w", markerfacecolor="gray", markersize=12,
+        Line2D([0], [0], marker="*", color="w", markerfacecolor="gray", markersize=8,
                markeredgecolor="black", label=f"{len(pair_ids)} highlighted pairs"),
     ]
     ax1.legend(handles=legend_handles, fontsize=8)
@@ -167,9 +167,9 @@ def main():
 
     for k, (pid, color) in enumerate(zip(pair_ids, pair_colors)):
         label = str(k + 1)
-        ax2.scatter(euc_u2[pid, 0], euc_u2[pid, 1], s=80, color=color,
+        ax2.scatter(euc_u2[pid, 0], euc_u2[pid, 1], s=144, color=color,
                     marker="*", edgecolors="black", linewidths=0.4, zorder=5)
-        ax2.scatter(cos_u2[pid, 0], cos_u2[pid, 1], s=80, color=color,
+        ax2.scatter(cos_u2[pid, 0], cos_u2[pid, 1], s=144, color=color,
                     marker="*", edgecolors="black", linewidths=0.4, zorder=5)
         for x, y in [(euc_u2[pid, 0], euc_u2[pid, 1]),
                      (cos_u2[pid, 0], cos_u2[pid, 1])]:
