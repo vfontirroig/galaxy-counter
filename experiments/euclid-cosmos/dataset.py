@@ -1,5 +1,5 @@
 """
-Dataset class for paired Euclid (VIS) x COSMOS (F150W) images.
+Dataset class for paired Euclid (VIS) x COSMOS (F115W) images.
 
 Reads from the HDF5 file produced by build_hdf5.py. Images are already
 preprocessed (ZP-rescaled, arcsinh range-compressed for COSMOS). This class
@@ -135,7 +135,7 @@ def compute_norm_stats(hdf5_path: str, n_samples: int = 10_000) -> dict:
 def main():
     from torch.utils.data import DataLoader
 
-    H5_PATH = "/n03data/fontirro/data_files/euclid_cosmos_test_pairs.h5"
+    H5_PATH = "/n03data/fontirro/data_files/euclid_cosmos_pairs_vis_f115w.h5"
 
     #print("Computing normalization stats...")
     #stats = compute_norm_stats(H5_PATH)

@@ -31,18 +31,18 @@ import os
 CATALOG_PATH = "/n03data/fontirro/data_files/cat_crossmatch_mag27_mag25.csv"  # path to the paired catalog
 
 EUCLID_COL = "file_euclid_vis"              # column name for the Euclid FITS file path
-COSMOS_COL = "file_cosmos_f150w"            # column name for the COSMOS FITS file path
+COSMOS_COL = "file_cosmos_f115w"            # column name for the COSMOS FITS file path
 
 EUCLID_EXISTS_COL = "cutout_euc_40_vis"    # boolean column: True if Euclid cutout exists
-COSMOS_EXISTS_COL = "cutout_cos_120_150w"  # boolean column: True if COSMOS cutout exists
+COSMOS_EXISTS_COL = "cutout_cos_120_115w"  # boolean column: True if COSMOS cutout exists
 
 EUCLID_DIR_PATH = "/n03data/fontirro/cutouts/euclid/40_cutouts/40_cutouts-vis/"  # base directory for Euclid VIS cutouts.
-COSMOS_DIR_PATH = "/n03data/fontirro/cutouts/cosmos/120_cutouts/f150w/"  # base directory for COSMOS F150W cutouts.
+COSMOS_DIR_PATH = "/n03data/fontirro/cutouts/cosmos/120_cutouts/f115w/"  # base directory for COSMOS F115W cutouts.
 
 EUCLID_HDU = 1   # HDU index for Euclid data (usually 1 for science extension)
 COSMOS_HDU = 0   # HDU index for COSMOS data (usually 0)
 
-OUTPUT_H5 = "/n03data/fontirro/data_files/euclid_cosmos_pairs_v4.h5"
+OUTPUT_H5 = "/n03data/fontirro/data_files/euclid_cosmos_pairs_vis_f115w.h5"
 
 NUM_WORKERS = 16  # parallel threads for loading + preprocessing
 
@@ -91,7 +91,7 @@ def process_pair(args: tuple) -> tuple:
         euc_tensor = load_fits(ep, EUCLID_HDU)
         cos_tensor = load_fits(cp, COSMOS_HDU)
         euc = preprocess_image_v2(euc_tensor, bands=["VIS"]).squeeze(0).numpy()
-        cos = preprocess_image_v2(cos_tensor, bands=["F150W"]).squeeze(0).numpy()
+        cos = preprocess_image_v2(cos_tensor, bands=["F115W"]).squeeze(0).numpy()
         cos_down = F.interpolate(
             torch.from_numpy(cos).unsqueeze(0), size=(H_SIZE, W_SIZE),
             mode="area",
