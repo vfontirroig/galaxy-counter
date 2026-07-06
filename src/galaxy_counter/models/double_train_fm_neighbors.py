@@ -235,7 +235,15 @@ class ConditionalFlowMatchingModule(pl.LightningModule):
         cond_embedding = torch.cat([cond_gal_embedding, cond_ins_embedding], dim=1)
         # (B, (1+k)*seq_len, embed_dim)
 
-        return self.velocity_model(
+        # Only route through the compiled/cudagraph-backed module during the
+        # actual training forward pass (fixed batch size, the hot loop that
+        # benefits from max-autotune). validation/sample()/compute_mse() run
+        # at varying, smaller batch sizes under no_grad; sending those through
+        # the compiled path forces a fresh AUTOTUNE + CUDA-graph pool per shape,
+        # which piles up host/device memory over the course of training.
+        velocity_model = self.velocity_model if self.training else self.velocity_model._orig_mod
+
+        return velocity_model(
             x_t,
             timesteps,
             encoder_hidden_states=cond_embedding,
