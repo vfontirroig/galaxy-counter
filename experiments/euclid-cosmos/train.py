@@ -267,8 +267,6 @@ def main():
         mask_center=False,
     )
 
-    model = torch.compile(model, mode="max-autotune")
-
     csv_logger = CSVLogger(save_dir=CKPT_DIR, name="logs")
 
     os.makedirs(CKPT_DIR, exist_ok=True)

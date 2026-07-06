@@ -180,6 +180,12 @@ class ConditionalFlowMatchingModule(pl.LightningModule):
                 attention_head_dim=attention_head_dim,
             )
 
+        # Compile only the heavy conv net; the rest of this module is Python-heavy
+        # control flow (branching, metadata handling, side-effect state for logging)
+        # that torch.compile + CUDA graphs handles poorly when wrapped around the
+        # whole LightningModule.
+        self.velocity_model = torch.compile(self.velocity_model, mode="max-autotune")
+
         # Initialize geometric loss function once (reused across all training steps)
         if self.lambda_geometric > 0:
             self.geom_loss_fn = geomloss.SamplesLoss(
