@@ -154,7 +154,7 @@ def main():
     legend_handles = [
         Line2D([0], [0], marker="o", color="w", markerfacecolor="steelblue",  markersize=6, label="Euclid VIS"),
         Line2D([0], [0], marker="o", color="w", markerfacecolor="darkorange", markersize=6, label="COSMOS F115W"),
-        Line2D([0], [0], marker="*", color="w", markerfacecolor="gray", markersize=8,
+        Line2D([0], [0], marker="*", color="w", markerfacecolor="gray", markersize=12,
                markeredgecolor="black", label=f"{len(pair_ids)} highlighted pairs"),
     ]
     ax1.legend(handles=legend_handles, fontsize=8)
@@ -181,7 +181,7 @@ def main():
     ax2.set_ylabel("UMAP 2")
     ax2.legend(handles=legend_handles, fontsize=8)
 
-    fig.suptitle(f"Latent space UMAP  |  N = {N} galaxy pairs", fontsize=11)
+    fig.suptitle(f"Latent space UMAP  |  N = {N} galaxy pairs", fontsize=15)
     plt.tight_layout()
     plt.savefig(args.out, dpi=150, bbox_inches="tight")
     plt.close()
