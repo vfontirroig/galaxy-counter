@@ -138,7 +138,7 @@ def main():
 
     kw = dict(s=4, alpha=0.5, rasterized=True)
     ax1.scatter(euc_u1[:, 0], euc_u1[:, 1], c="steelblue",  label="Euclid VIS", **kw)
-    ax1.scatter(cos_u1[:, 0], cos_u1[:, 1], c="darkorange", label="COSMOS F115W", **kw)
+    ax1.scatter(cos_u1[:, 0], cos_u1[:, 1], c="darkorange", label="COSMOS F150W", **kw)
 
     for k, (pid, color) in enumerate(zip(pair_ids, pair_colors)):
         label = str(k + 1)
@@ -153,17 +153,17 @@ def main():
 
     legend_handles = [
         Line2D([0], [0], marker="o", color="w", markerfacecolor="steelblue",  markersize=6, label="Euclid VIS"),
-        Line2D([0], [0], marker="o", color="w", markerfacecolor="darkorange", markersize=6, label="COSMOS F115W"),
+        Line2D([0], [0], marker="o", color="w", markerfacecolor="darkorange", markersize=6, label="COSMOS F150W"),
         Line2D([0], [0], marker="*", color="w", markerfacecolor="gray", markersize=8,
                markeredgecolor="black", label=f"{len(pair_ids)} highlighted pairs"),
     ]
-    ax1.legend(handles=legend_handles, fontsize=8)
-    ax1.set_title("encoder_1 — same-galaxy (physics)\nEuclid & COSMOS should overlap")
-    ax1.set_xlabel("UMAP 1")
-    ax1.set_ylabel("UMAP 2")
+    ax1.legend(handles=legend_handles, fontsize=12)
+    ax1.set_title("encoder_1 — same-galaxy (physics)", fontsize=14)
+    ax1.set_xlabel("UMAP 1", fontsize=10)
+    ax1.set_ylabel("UMAP 2", fontsize=10)
 
     ax2.scatter(euc_u2[:, 0], euc_u2[:, 1], c="steelblue",  label="Euclid VIS", **kw)
-    ax2.scatter(cos_u2[:, 0], cos_u2[:, 1], c="darkorange", label="COSMOS F115W", **kw)
+    ax2.scatter(cos_u2[:, 0], cos_u2[:, 1], c="darkorange", label="COSMOS F150W", **kw)
 
     for k, (pid, color) in enumerate(zip(pair_ids, pair_colors)):
         label = str(k + 1)
@@ -176,10 +176,10 @@ def main():
             ax2.annotate(label, xy=(x, y), xytext=(4, 4), textcoords="offset points",
                          fontsize=7, color=color, fontweight="bold")
 
-    ax2.set_title("encoder_2 — same-instrument\nSurveys may separate")
-    ax2.set_xlabel("UMAP 1")
-    ax2.set_ylabel("UMAP 2")
-    ax2.legend(handles=legend_handles, fontsize=8)
+    ax2.set_title("encoder_2 — same-instrument", fontsize=14)
+    ax2.set_xlabel("UMAP 1", fontsize=10)
+    ax2.set_ylabel("UMAP 2", fontsize=10)
+    ax2.legend(handles=legend_handles, fontsize=12)
 
     fig.suptitle(f"Latent space UMAP  |  N = {N} galaxy pairs", fontsize=15)
     plt.tight_layout()
@@ -201,7 +201,7 @@ def main():
         if n_pairs == 1:
             axes = axes[:, np.newaxis]
 
-        row_labels = ["Euclid VIS", "COSMOS F115W"]
+        row_labels = ["Euclid VIS", "COSMOS F150W"]
         for k, (pid, color) in enumerate(zip(pair_ids, pair_colors)):
             for row, img in enumerate([hl_euclid_imgs[k], hl_cosmos_imgs[k]]):
                 ax = axes[row, k]
@@ -212,12 +212,12 @@ def main():
                     spine.set_edgecolor(color)
                     spine.set_linewidth(3)
                 if row == 0:
-                    ax.set_title(f"Pair {k + 1}", color=color, fontsize=10, fontweight="bold")
+                    ax.set_title(f"Pair {k + 1}", color=color, fontsize=12, fontweight="bold")
 
         for row, label in enumerate(row_labels):
-            axes[row, 0].set_ylabel(label, fontsize=9)
+            axes[row, 0].set_ylabel(label, fontsize=12)
 
-        fig2.suptitle("Highlighted galaxy cutouts", fontsize=11)
+        fig2.suptitle("Highlighted galaxy cutouts", fontsize=15)
         plt.tight_layout()
         plt.savefig(args.out_cutouts, dpi=150, bbox_inches="tight")
         plt.close()
