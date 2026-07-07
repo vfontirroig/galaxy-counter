@@ -205,19 +205,19 @@ def main():
         for k, (pid, color) in enumerate(zip(pair_ids, pair_colors)):
             for row, img in enumerate([hl_euclid_imgs[k], hl_cosmos_imgs[k]]):
                 ax = axes[row, k]
-                ax.imshow(img, cmap="gray", origin="lower", vmin=0, vmax=1)
+                ax.imshow(img, cmap="gray", origin="lower")
                 ax.set_xticks([])
                 ax.set_yticks([])
                 for spine in ax.spines.values():
                     spine.set_edgecolor(color)
                     spine.set_linewidth(3)
                 if row == 0:
-                    ax.set_title(f"Pair {k + 1}", color=color, fontsize=12, fontweight="bold")
+                    ax.set_title(f"Pair {k + 1}", color=color, fontsize=14, fontweight="bold")
 
         for row, label in enumerate(row_labels):
-            axes[row, 0].set_ylabel(label, fontsize=12)
+            axes[row, 0].set_ylabel(label, fontsize=15)
 
-        fig2.suptitle("Highlighted galaxy cutouts", fontsize=15)
+        #fig2.suptitle("Highlighted galaxy cutouts", fontsize=15)
         plt.tight_layout()
         plt.savefig(args.out_cutouts, dpi=150, bbox_inches="tight")
         plt.close()
