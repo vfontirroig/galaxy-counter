@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #SBATCH --job-name=check_encoders
-#SBATCH --output=/home/fontirro/logs/check_encoders_%j.out
-#SBATCH --error=/home/fontirro/logs/check_encoders_%j.err
+#SBATCH --output=/n03data/fontirro/logs/check_encoders_%j.out
+#SBATCH --error=/n03data/fontirro/logs/check_encoders_%j.err
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=2
 #SBATCH --mem=8G

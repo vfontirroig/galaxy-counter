@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #SBATCH --job-name=euclid_cosmos_test
-#SBATCH --output=/home/fontirro/logs/euclid_cosmos_test_%j.out
-#SBATCH --error=/home/fontirro/logs/euclid_cosmos_test_%j.err
+#SBATCH --output=/n03data/fontirro/logs/euclid_cosmos_test_%j.out
+#SBATCH --error=/n03data/fontirro/logs/euclid_cosmos_test_%j.err
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=16G
