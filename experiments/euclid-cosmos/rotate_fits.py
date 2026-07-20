@@ -1,3 +1,8 @@
+'''
+Rotate FITS images to align with North using the information from WCS.
+
+'''
+
 
 import os
 from astropy.io import fits
@@ -10,6 +15,10 @@ from reproject import reproject_interp
 from reproject.mosaicking import find_optimal_celestial_wcs
 from astropy.visualization import ImageNormalize, PercentileInterval, AsinhStretch
 import matplotlib.pyplot as plt
+from concurrent.futures import ProcessPoolExecutor
+from tqdm import tqdm
+
+NUM_WORKERS = 16  # parallel processes for rotating FITS files (CPU-bound reprojection)
 
 def rotate(fits_path):
     """
@@ -37,6 +46,20 @@ def rotate(fits_path):
 
     return hdu_aligned
 
+
+def process_file(args: tuple) -> tuple:
+    """Rotate a single FITS file and write the aligned output. Returns (file, error)."""
+    file, input_dir, output_dir = args
+    try:
+        fits_file = os.path.join(input_dir, file)
+        hdu_aligned = rotate(fits_file)
+        output_path = os.path.join(output_dir, file)
+        hdu_aligned.writeto(output_path, overwrite=True)
+        return file, None
+    except Exception as e:
+        return file, str(e)
+
+
 def main():
     # Example usage
     
@@ -63,19 +86,22 @@ def main():
     INPUT_DIR = '/n03data/fontirro/cutouts/cosmos/256_cutouts/f150w'
     OUTPUT_DIR = '/n03data/fontirro/cutouts/cosmos/256_cutouts_rotated/f150w'
 
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+
     files_f150w = [f for f in os.listdir(INPUT_DIR) if f.endswith('.fits')]
+    args_list = [(f, INPUT_DIR, OUTPUT_DIR) for f in files_f150w] 
 
-    for file in files_f150w:
-        fits_file = os.path.join(INPUT_DIR, file)
-        hdu_aligned = rotate(fits_file)
+    skipped = 0
+    with ProcessPoolExecutor(max_workers=NUM_WORKERS) as executor:
+        results = executor.map(process_file, args_list)
+        for file, err in tqdm(results, total=len(args_list), desc="Rotating"):
+            if err:
+                print(f"\n[WARN] skipping {file}: {err}")
+                skipped += 1
 
-
-        output_path = os.path.join(OUTPUT_DIR, f'{file}')
-        hdu_aligned.writeto(output_path, overwrite=True)
-        print(f"File {file} FITS saved to {output_path}.")
-
-
-
+    print(f"Done. {len(args_list) - skipped}/{len(args_list)} files rotated and saved to {OUTPUT_DIR}")
+    if skipped:
+        print(f"  {skipped} files skipped due to errors.")
 
 
 if __name__ == "__main__":
