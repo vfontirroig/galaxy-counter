@@ -40,28 +40,42 @@ def rotate(fits_path):
 def main():
     # Example usage
     
-    print("Reading file")
-    fits_file_ex = '/n03data/fontirro/cutouts/cosmos/256_cutouts/f115w/F115W_5.fits'
+    # print("Reading file")
+    # fits_file_ex = '/n03data/fontirro/cutouts/cosmos/256_cutouts/f115w/F115W_5.fits'
 
 
-    hdu_aligned = rotate(fits_file_ex)
-    wcs = WCS(hdu_aligned.header)
-    print(wcs)
-    print(hdu_aligned.data.shape)
+    # hdu_aligned = rotate(fits_file_ex)
+    # wcs = WCS(hdu_aligned.header)
+    # print(wcs)
+    # print(hdu_aligned.data.shape)
 
-    fig, ax = plt.subplots(1, 1, figsize=(5, 5), subplot_kw=dict(projection=wcs))
-    ax.imshow(hdu_aligned.data, origin='lower', cmap='plasma', norm=ImageNormalize(hdu_aligned.data, interval=PercentileInterval(99.5), stretch=AsinhStretch()))
+    # fig, ax = plt.subplots(1, 1, figsize=(5, 5), subplot_kw=dict(projection=wcs))
+    # ax.imshow(hdu_aligned.data, origin='lower', cmap='plasma', norm=ImageNormalize(hdu_aligned.data, interval=PercentileInterval(99.5), stretch=AsinhStretch()))
 
-    out_path = '/n03data/fontirro/plots_examples/cosmos_rotation/aligned_image_example.png'
-    os.makedirs(os.path.dirname(out_path), exist_ok=True)
-    plt.savefig(out_path, dpi=300, bbox_inches='tight')
+    # out_path = '/n03data/fontirro/plots_examples/cosmos_rotation/aligned_image_example.png'
+    # os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    # plt.savefig(out_path, dpi=300, bbox_inches='tight')
 
-    print("Saved figure.")
+    # print("Saved figure.")
 
-    # Optionally, save the aligned FITS to disk
-    # output_path = "path/to/your/output_aligned.fits"  # Replace with desired output path
-    # hdu_aligned.writeto(output_path, overwrite=True)
-    # print(f"Aligned FITS saved to {output_path}")
+    #Save all files from a directory. This case F150W.
+
+    INPUT_DIR = '/n03data/fontirro/cutouts/cosmos/256_cutouts/f150w'
+    OUTPUT_DIR = '/n03data/fontirro/cutouts/cosmos/256_cutouts_rotated/f150w'
+
+    files_f150w = [f for f in os.listdir(INPUT_DIR) if f.endswith('.fits')]
+
+    for file in files_f150w:
+        fits_file = os.path.join(INPUT_DIR, file)
+        hdu_aligned = rotate(fits_file)
+
+
+        output_path = os.path.join(OUTPUT_DIR, f'{file}')
+        hdu_aligned.writeto(output_path, overwrite=True)
+        print(f"File {file} FITS saved to {output_path}.")
+
+
+
 
 
 if __name__ == "__main__":
