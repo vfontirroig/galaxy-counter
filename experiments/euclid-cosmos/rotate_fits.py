@@ -41,7 +41,7 @@ def main():
     # Example usage
     
     print("Reading file")
-    fits_file_ex = '/n03data/fontirro/cutouts/cosmos/256_cutouts/f150w/F150W_5.fits'
+    fits_file_ex = '/n03data/fontirro/cutouts/cosmos/256_cutouts/f115w/F115W_5.fits'
 
 
     hdu_aligned = rotate(fits_file_ex)
@@ -52,7 +52,9 @@ def main():
     fig, ax = plt.subplots(1, 1, figsize=(5, 5), subplot_kw=dict(projection=wcs))
     ax.imshow(hdu_aligned.data, origin='lower', cmap='plasma', norm=ImageNormalize(hdu_aligned.data, interval=PercentileInterval(99.5), stretch=AsinhStretch()))
 
-    plt.savefig('/n03data/fontirro/plots_examples/cosmos_rotation/aligned_image_example.png', dpi=300, bbox_inches='tight')
+    out_path = '/n03data/fontirro/plots_examples/cosmos_rotation/aligned_image_example.png'
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    plt.savefig(out_path, dpi=300, bbox_inches='tight')
 
     print("Saved figure.")
 
@@ -60,3 +62,7 @@ def main():
     # output_path = "path/to/your/output_aligned.fits"  # Replace with desired output path
     # hdu_aligned.writeto(output_path, overwrite=True)
     # print(f"Aligned FITS saved to {output_path}")
+
+
+if __name__ == "__main__":
+    main()
