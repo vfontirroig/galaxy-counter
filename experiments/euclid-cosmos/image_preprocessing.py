@@ -299,23 +299,23 @@ def main():
     print(f"   Range: [{im_cropped.min():.4f}, {im_cropped.max():.4f}]")
 
 
-    im_cropped_2d = im_cropped.squeeze().numpy()  # (1, 1, H, W) -> (H, W)
+    # im_cropped_2d = im_cropped.squeeze().numpy()  # (1, 1, H, W) -> (H, W)
 
-    fig, ax = plt.subplots(1, 1, figsize=(5, 5))
-    ax.imshow(im_cropped_2d, origin='lower', cmap='plasma', norm=ImageNormalize(im_cropped_2d, interval=PercentileInterval(99.5), stretch=AsinhStretch()))
+    # fig, ax = plt.subplots(1, 1, figsize=(5, 5))
+    # ax.imshow(im_cropped_2d, origin='lower', cmap='plasma', norm=ImageNormalize(im_cropped_2d, interval=PercentileInterval(99.5), stretch=AsinhStretch()))
 
-    out_path = '/n03data/fontirro/plots_examples/cosmos_rotation/aligned_image_example_preprocess.png'
-    os.makedirs(os.path.dirname(out_path), exist_ok=True)
-    plt.savefig(out_path, dpi=300, bbox_inches='tight')
+    # out_path = '/n03data/fontirro/plots_examples/cosmos_rotation/aligned_image_example_preprocess.png'
+    # os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    # plt.savefig(out_path, dpi=300, bbox_inches='tight')
 
-    print("Saved figure.")
+    # print("Saved figure.")
 
 
     # Step 2: Rescale Euclid to COSMOS ZP (23.9); COSMOS passes through unchanged
-    # rescaler = RescaleToCOSMOS()
-    # im_rescaled = rescaler.forward(im_cropped.clone(), band)
-    # print(f"\n2. After rescale.forward (band={band}): {im_rescaled.shape}")
-    # print(f"   Range: [{im_rescaled.min():.4f}, {im_rescaled.max():.4f}]")
+    rescaler = RescaleToCOSMOS()
+    im_rescaled = rescaler.forward(im_cropped.clone(), band)
+    print(f"\n2. After rescale.forward (band={band}): {im_rescaled.shape}")
+    print(f"   Range: [{im_rescaled.min():.4f}, {im_rescaled.max():.4f}]")
 
     # Step 3: Range compression (skipped for Euclid — already compressed)
     # is_euclid = band in EUCLID_ZP
