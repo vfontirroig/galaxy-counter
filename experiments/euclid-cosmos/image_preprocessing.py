@@ -196,7 +196,7 @@ COSMOS_BANDS = ["COS-F115W", "COS-F150W", "COS-F277W", "COS-F444W"]
 
 def preprocess_image_v2(
     image: torch.Tensor,
-    crop_size: int = 96,
+    crop_size: int = 120,
     survey: str = "cosmos",
     bands: list[str] | None = None,
 ) -> torch.Tensor:
@@ -229,29 +229,34 @@ def preprocess_image_v2(
                 f"Survey '{survey}' expects {len(bands)} channels, got {image.shape[1]}"
             )
 
-    # 3. Pipeline Execution
+    # Pipeline Execution
 
-    # Crop (Default 96)
-    # cropper = CenterCrop(crop_size=crop_size)
-    # processed = cropper(image)
+    # 1. Crop (Default 120)
+    cropper = CenterCrop(crop_size=crop_size)
+    processed = cropper(image)
 
     # Clamp
     # clamper = Clamp()
     # processed = clamper(processed.clone(), bands)
 
-    # Rescale each band to COSMOS ZP
+    # 2. Rescale each band to COSMOS ZP. COSMOS cuouts are skipped.
     processed = image.clone()
     rescaler = RescaleToCOSMOS()
     for i, band in enumerate(bands):
         processed[:, i, :, :] = rescaler.forward(processed[:, i:i+1, :, :], band)[:, 0, :, :]
 
-    # Range Compress (asinh)— skip for Euclid (already compressed)
-    is_euclid = any(b in EUCLID_ZP for b in bands)
-    if not is_euclid:
-        range_compressor = RangeCompress()
-        processed = range_compressor.forward(processed.clone())
+    # 3. Range Compress (asinh).
+    range_compression_factor = 0.01
+    mult_factor = 10.0
+    range_compressor = RangeCompress(
+        range_compression_factor=range_compression_factor,
+        mult_factor=mult_factor,
+    )
+    processed = range_compressor.forward(processed.clone())
 
-    # 4. Output handling
+
+
+    # Output handling
     # If input was not batched (3D), return 3D. If batched, return 4D.
     if not is_batched:
         processed = processed.squeeze(0) # (1, C, H, W) → (C, H, W)
