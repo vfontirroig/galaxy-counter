@@ -114,14 +114,14 @@ def main():
     catalog = catalog[mask].reset_index(drop=True)
     print(f"Pairs with both cutouts present: {len(catalog)}")
 
-    euclid_paths = [os.path.join(EUCLID_DIR_PATH, p) for p in catalog[EUCLID_COL]]
-    cosmos_paths = [os.path.join(COSMOS_DIR_PATH, p) for p in catalog[COSMOS_COL]]
-    N = len(euclid_paths)
+    # euclid_paths = [os.path.join(EUCLID_DIR_PATH, p) for p in catalog[EUCLID_COL]]
+    # cosmos_paths = [os.path.join(COSMOS_DIR_PATH, p) for p in catalog[COSMOS_COL]]
+    # N = len(euclid_paths)
 
-    H_euc, W_euc = get_spatial_size(euclid_paths[0], EUCLID_HDU)
-    H_cos, W_cos = get_spatial_size(cosmos_paths[0], COSMOS_HDU)
-    print(f"Euclid image size : {H_euc} x {W_euc}")
-    print(f"COSMOS image size : {H_cos} x {W_cos}")
+    # H_euc, W_euc = get_spatial_size(euclid_paths[0], EUCLID_HDU)
+    # H_cos, W_cos = get_spatial_size(cosmos_paths[0], COSMOS_HDU)
+    # print(f"Euclid image size : {H_euc} x {W_euc}")
+    # print(f"COSMOS image size : {H_cos} x {W_cos}")
 
 
     # # ------------------------------------------------------------------
