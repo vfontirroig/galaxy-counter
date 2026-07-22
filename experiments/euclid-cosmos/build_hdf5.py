@@ -94,11 +94,11 @@ def process_pair(args: tuple) -> tuple:
         cos = preprocess_image_v2(cos_tensor, bands=["F150W"]).squeeze(0).numpy()
         cos_down = F.interpolate(
             torch.from_numpy(cos).unsqueeze(0), size=(H_SIZE, W_SIZE),
-            mode="linear",
+            mode="bilinear",
         ).squeeze(0).numpy() #(1, H_SIZE, W_SIZE)
         euc_up = F.interpolate(
             torch.from_numpy(euc).unsqueeze(0), size=(H_SIZE, W_SIZE),
-            mode="linear",
+            mode="bilinear",
         ).squeeze(0).numpy() #(1, H_SIZE, W_SIZE)
         return i, euc, cos, cos_down, euc_up, None
     except Exception as e:
