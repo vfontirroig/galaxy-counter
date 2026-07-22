@@ -114,6 +114,20 @@ def main():
     catalog = catalog[mask].reset_index(drop=True)
     print(f"Pairs with both cutouts present: {len(catalog)}")
 
+    #check if the files exist
+    missing_euclid = []
+    missing_cosmos = []
+    for i, row in catalog.iterrows():
+        euclid_path = os.path.join(EUCLID_DIR_PATH, row[EUCLID_COL])
+        cosmos_path = os.path.join(COSMOS_DIR_PATH, row[COSMOS_COL])
+        if not os.path.isfile(euclid_path):
+            missing_euclid.append(euclid_path)
+        if not os.path.isfile(cosmos_path):
+            missing_cosmos.append(cosmos_path)
+
+    print(f"Missing Euclid files: {len(missing_euclid)}")
+    print(f"Missing COSMOS files: {len(missing_cosmos)}")
+
     # euclid_paths = [os.path.join(EUCLID_DIR_PATH, p) for p in catalog[EUCLID_COL]]
     # cosmos_paths = [os.path.join(COSMOS_DIR_PATH, p) for p in catalog[COSMOS_COL]]
     # N = len(euclid_paths)
