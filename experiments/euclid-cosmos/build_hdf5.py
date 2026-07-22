@@ -108,7 +108,7 @@ def process_pair(args: tuple) -> tuple:
 def main():
     catalog = pd.read_csv(CATALOG_PATH)
     print(f"Catalog loaded: {len(catalog)} pairs")
-    #print(f"Columns: {list(catalog.columns)}")
+    print(f"Columns: {list(catalog.columns[-30:])}")
 
     mask = (catalog[EUCLID_EXISTS_COL] == 1) & (catalog[COSMOS_EXISTS_COL] == 1)
     catalog = catalog[mask].reset_index(drop=True)
