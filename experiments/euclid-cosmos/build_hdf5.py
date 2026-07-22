@@ -138,44 +138,44 @@ def main():
     print(f"COSMOS image size : {H_cos} x {W_cos}")
 
 
-    # # ------------------------------------------------------------------
-    # # Pass 1: filter out Euclid cutouts with >= 10% zero pixels
-    # # Uses threads (I/O bound, no torch) so no fork/spawn overhead.
-    # # ------------------------------------------------------------------
-    # print(f"\nScanning {N} Euclid files for zero-pixel fraction...")
-    # with ThreadPoolExecutor(max_workers=NUM_WORKERS) as pool:
-    #     zero_fracs = list(tqdm(
-    #         pool.map(euclid_zero_frac, euclid_paths),
-    #         total=N, desc="Scanning", mininterval=5,
-    #     ))
-    # valid = [zf < 0.10 for zf in zero_fracs]
-    # euclid_paths = [p for p, v in zip(euclid_paths, valid) if v]
-    # cosmos_paths = [p for p, v in zip(cosmos_paths, valid) if v]
-    # catalog      = catalog[valid].reset_index(drop=True)
-    # N_valid = len(euclid_paths)
-    # print(f"Valid pairs after filtering: {N_valid}/{N}  ({N - N_valid} skipped, zero_frac >= 10%)")
+    # ------------------------------------------------------------------
+    # Pass 1: filter out Euclid cutouts with >= 10% zero pixels
+    # Uses threads (I/O bound, no torch) so no fork/spawn overhead.
+    # ------------------------------------------------------------------
+    print(f"\nScanning {N} Euclid files for zero-pixel fraction...")
+    with ThreadPoolExecutor(max_workers=NUM_WORKERS) as pool:
+        zero_fracs = list(tqdm(
+            pool.map(euclid_zero_frac, euclid_paths),
+            total=N, desc="Scanning", mininterval=5,
+        ))
+    valid = [zf < 0.10 for zf in zero_fracs]
+    euclid_paths = [p for p, v in zip(euclid_paths, valid) if v]
+    cosmos_paths = [p for p, v in zip(cosmos_paths, valid) if v]
+    catalog      = catalog[valid].reset_index(drop=True)
+    N_valid = len(euclid_paths)
+    print(f"Valid pairs after filtering: {N_valid}/{N}  ({N - N_valid} skipped, zero_frac >= 10%)")
 
-    # if N_valid == 0:
-    #     print("[ERROR] No valid pairs found — check EUCLID_HDU and file paths.")
-    #     sys.exit(1)
+    if N_valid == 0:
+        print("[ERROR] No valid pairs found — check EUCLID_HDU and file paths.")
+        sys.exit(1)
 
-    # # ------------------------------------------------------------------
-    # # Quick sanity check on first valid pair
-    # # ------------------------------------------------------------------
-    # print("\nTesting first pair (sequential)...")
-    # _, t_euc, t_cos, _, t_euc_up, t_err = process_pair(
-    #     (0, euclid_paths[0], cosmos_paths[0])
-    # )
-    # if t_err:
-    #     print(f"[ERROR] First pair failed:\n{t_err}")
-    #     sys.exit(1)
-    # print(f"  euc [{t_euc.min():.4f}, {t_euc.max():.4f}]  euc_up [{t_euc_up.min():.4f}, {t_euc_up.max():.4f}]  cos [{t_cos.min():.4f}, {t_cos.max():.4f}]")
-    # print("OK.\n")
+    # ------------------------------------------------------------------
+    # Quick sanity check on first valid pair
+    # ------------------------------------------------------------------
+    print("\nTesting first pair (sequential)...")
+    _, t_euc, t_cos, _, t_euc_up, t_err = process_pair(
+        (0, euclid_paths[0], cosmos_paths[0])
+    )
+    if t_err:
+        print(f"[ERROR] First pair failed:\n{t_err}")
+        sys.exit(1)
+    print(f"  euc [{t_euc.min():.4f}, {t_euc.max():.4f}]  euc_up [{t_euc_up.min():.4f}, {t_euc_up.max():.4f}]  cos [{t_cos.min():.4f}, {t_cos.max():.4f}]")
+    print("OK.\n")
 
-    # H_euc, W_euc = get_spatial_size(euclid_paths[0], EUCLID_HDU)
-    # H_cos, W_cos = get_spatial_size(cosmos_paths[0], COSMOS_HDU)
-    # print(f"Euclid image size : {H_euc} x {W_euc}")
-    # print(f"COSMOS image size : {H_cos} x {W_cos}")
+    H_euc, W_euc = get_spatial_size(euclid_paths[0], EUCLID_HDU)
+    H_cos, W_cos = get_spatial_size(cosmos_paths[0], COSMOS_HDU)
+    print(f"Euclid image size : {H_euc} x {W_euc}")
+    print(f"COSMOS image size : {H_cos} x {W_cos}")
 
    
     # ------------------------------------------------------------------
