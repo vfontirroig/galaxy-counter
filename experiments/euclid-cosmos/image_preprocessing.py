@@ -70,7 +70,8 @@ class RescaleToCOSMOS:
 
 
 class RangeCompress:
-    """Formatter that applies arcsinh-based range compression."""
+    """Formatter that applies arcsinh-based normalization. This formula comes from AION-1 Paper 
+    (Parker et al 2025) and is used to compress the dynamic range of the images."""
 
     def __init__(self, range_compression_factor: float = 0.01, mult_factor: float = 10.0):
         """
@@ -86,7 +87,6 @@ class RangeCompress:
     def forward(self, image):
         """
         Apply range compression: arcsinh(x / factor) * factor * mult_factor.
-
         Args:
             image: Input tensor
 
@@ -268,6 +268,7 @@ def main():
     import os
     from astropy.wcs import WCS
     from astropy.visualization import ImageNormalize, PercentileInterval, AsinhStretch
+    interval = MinMaxInterval()
 
 
     #EUCLID_FILE = "/n03data/fontirro/euclid/40_cutouts/40_cutouts-vis/cutout_process_013_68b1674fTILE_101544256_14974135090968736_149.741351_2.147102_cutout.fits"
@@ -298,7 +299,7 @@ def main():
     print(f"\n1. After cropper (crop_size=120): {im_cropped.shape}")
     print(f"   Range: [{im_cropped.min():.4f}, {im_cropped.max():.4f}]")
 
-
+    #Checking cropped image
     # im_cropped_2d = im_cropped.squeeze().numpy()  # (1, 1, H, W) -> (H, W)
 
     # fig, ax = plt.subplots(1, 1, figsize=(5, 5))
@@ -317,24 +318,33 @@ def main():
     print(f"\n2. After rescale.forward (band={band}): {im_rescaled.shape}")
     print(f"   Range: [{im_rescaled.min():.4f}, {im_rescaled.max():.4f}]")
 
-    # Step 3: Range compression (skipped for Euclid — already compressed)
-    # is_euclid = band in EUCLID_ZP
-    # if not is_euclid:
-    #     range_compression_factor = 0.01
-    #     mult_factor = 10.0
-    #     range_compressor = RangeCompress(
-    #         range_compression_factor=range_compression_factor,
-    #         mult_factor=mult_factor,
-    #     )
-    #     im_range_compressed = range_compressor.forward(im_rescaled.clone())
-    #     print(f"\n3. After range_compress: {im_range_compressed.shape}")
-    #     print(f"   Range: [{im_range_compressed.min():.4f}, {im_range_compressed.max():.4f}]")
-    #     print(f"   range_compression_factor: {range_compression_factor}")
-    #     print(f"   mult_factor: {mult_factor}")
-    #     print(f"   Formula: arcsinh(x / {range_compression_factor}) * {range_compression_factor} * {mult_factor}")
-    # else:
-    #     im_range_compressed = im_rescaled
-    #     print(f"\n3. Range compression skipped (Euclid — already compressed)")
+
+    # Step 3: Range compression (both COSMOS and EUCLID)
+    range_compression_factor = 0.01
+    mult_factor = 10.0
+    range_compressor = RangeCompress(
+        range_compression_factor=range_compression_factor,
+        mult_factor=mult_factor,
+    )
+    im_range_compressed = range_compressor.forward(im_rescaled.clone())
+    print(f"\n3. After range_compress: {im_range_compressed.shape}")
+    print(f"   Range: [{im_range_compressed.min():.4f}, {im_range_compressed.max():.4f}]")
+    print(f"   range_compression_factor: {range_compression_factor}")
+    print(f"   mult_factor: {mult_factor}")
+    print(f"   Formula: arcsinh(x / {range_compression_factor}) * {range_compression_factor} * {mult_factor}")
+    
+
+    im_cropped_2d = im_range_compressed.squeeze().numpy()  # (1, 1, H, W) -> (H, W)
+
+    fig, ax = plt.subplots(1, 1, figsize=(5, 5))
+    ax.imshow(im_cropped_2d, origin='lower', cmap='plasma')
+
+    out_path = '/n03data/fontirro/plots_examples/cosmos_rotation/aligned_image_example_preprocess.png'
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    plt.savefig(out_path, dpi=300, bbox_inches='tight')
+
+    print("Saved figure.")
+
 
     # # Summary
     # print("\n" + "=" * 60)
