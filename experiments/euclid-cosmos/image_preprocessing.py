@@ -235,13 +235,15 @@ def preprocess_image_v2(
     if crop_size is not None and crop_size > 0:
         cropper = CenterCrop(crop_size=crop_size)
         processed = cropper(image)
+    else:
+        processed = image.clone()
 
     # Clamp
     # clamper = Clamp()
     # processed = clamper(processed.clone(), bands)
 
     # 2. Rescale each band to COSMOS ZP. COSMOS cuouts are skipped.
-    processed = image.clone()
+    processed = processed.clone()
     rescaler = RescaleToCOSMOS()
     for i, band in enumerate(bands):
         processed[:, i, :, :] = rescaler.forward(processed[:, i:i+1, :, :], band)[:, 0, :, :]

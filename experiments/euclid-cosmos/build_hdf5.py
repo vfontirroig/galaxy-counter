@@ -196,7 +196,7 @@ def main():
     # Quick sanity check on first valid pair
     # ------------------------------------------------------------------
     print("\nTesting first pair (sequential)...")
-    _, t_euc, t_cos, _, t_euc_up, t_err = process_pair(
+    _, i, t_euc, t_cos, t_cos_down, t_euc_up, t_err = process_pair(
         (0, euclid_paths[0], cosmos_paths[0])
     )
     if t_err:
