@@ -8,17 +8,6 @@ from __future__ import annotations
 import torch
 
 
-# Keeps track of the band indices for HSC and DES bands
-BAND_TO_INDEX = {
-    "VIS": 0,
-    "F115W": 1
-}
-# Maximum band center values for HSC and DES bands
-BAND_CENTER_MAX = {
-    "VIS": 80,
-    "F115W": 110
-}
-
 class CenterCrop:
     """Formatter that crops the images to have a fixed number of bands.
     i.e. It crops a square region of size crop_size × crop_size from the center of each image.
@@ -272,14 +261,22 @@ def preprocess_image_v2(
 
 def main():
     """Demonstrate the preprocessing pipeline on one Euclid VIS and one COSMOS F115W cutout."""
+    
     import numpy as np
     from astropy.io import fits
+    import matplotlib.pyplot as plt
+    import os
+    from astropy.wcs import WCS
+    from astropy.visualization import ImageNormalize, PercentileInterval, AsinhStretch
 
-    EUCLID_FILE = "/n03data/fontirro/euclid/40_cutouts/40_cutouts-vis/cutout_process_013_68b1674fTILE_101544256_14974135090968736_149.741351_2.147102_cutout.fits"
-    #COSMOS_FILE = "/n03data/fontirro/cosmos/120_cutouts/F115W_your_galaxy_id.fits"
+
+    #EUCLID_FILE = "/n03data/fontirro/euclid/40_cutouts/40_cutouts-vis/cutout_process_013_68b1674fTILE_101544256_14974135090968736_149.741351_2.147102_cutout.fits"
+    COSMOS_FILE = "/n03data/fontirro/cutouts/cosmos/256_cutouts_rotated/f150w/F150W_5.fits"
 
 
-    label,filepath,hdu_index, band =  "EUC-VIS", EUCLID_FILE, 1, "VIS"
+    #label,filepath,hdu_index, band =  "EUC-VIS", EUCLID_FILE, 1, "VIS"
+    label,filepath,hdu_index, band =  "COS-F150W", COSMOS_FILE, 0, "F150W"
+
 
     print("\n" + "=" * 60)
     print(f"PREPROCESSING PIPELINE — {label}")
@@ -288,55 +285,73 @@ def main():
     # Load image data.
     with fits.open(filepath) as hdul:
         data = hdul[hdu_index].data.astype(np.float32)
+        wcs = WCS(hdul[hdu_index].header)
     if data.ndim == 2:
         data = data[np.newaxis]
     im_full = torch.from_numpy(data).unsqueeze(0)  # (1, 1, H, W)
     print(f"\n1. Original image shape: {im_full.shape}")
     print(f"   Range: [{im_full.min():.4f}, {im_full.max():.4f}]")
 
-    # Step 3: Rescale Euclid to COSMOS ZP (23.9); COSMOS passes through unchanged
-    rescaler = RescaleToCOSMOS()
-    im_rescaled = rescaler.forward(im_full.clone(), band)
-    print(f"\n2. After rescale.forward (band={band}): {im_rescaled.shape}")
-    print(f"   Range: [{im_rescaled.min():.4f}, {im_rescaled.max():.4f}]")
+    # Step 1: Crop image to 120x120 (if needed)
+    cropper = CenterCrop(crop_size=120)
+    im_cropped = cropper(im_full)
+    print(f"\n1. After cropper (crop_size=120): {im_cropped.shape}")
 
-    # Step 4: Range compression (skipped for Euclid — already compressed)
-    is_euclid = band in EUCLID_ZP
-    if not is_euclid:
-        range_compression_factor = 0.01
-        mult_factor = 10.0
-        range_compressor = RangeCompress(
-            range_compression_factor=range_compression_factor,
-            mult_factor=mult_factor,
-        )
-        im_range_compressed = range_compressor.forward(im_rescaled.clone())
-        print(f"\n3. After range_compress: {im_range_compressed.shape}")
-        print(f"   Range: [{im_range_compressed.min():.4f}, {im_range_compressed.max():.4f}]")
-        print(f"   range_compression_factor: {range_compression_factor}")
-        print(f"   mult_factor: {mult_factor}")
-        print(f"   Formula: arcsinh(x / {range_compression_factor}) * {range_compression_factor} * {mult_factor}")
-    else:
-        im_range_compressed = im_rescaled
-        print(f"\n3. Range compression skipped (Euclid — already compressed)")
+    im_cropped_2d = im_cropped.squeeze().numpy()  # (1, 1, H, W) -> (H, W)
 
-    # Summary
-    print("\n" + "=" * 60)
-    print("SUMMARY OF TRANSFORMATIONS")
-    print("=" * 60)
-    print(f"Original range:    [{im_full.min():.4f}, {im_full.max():.4f}]")
-    print(f"Rescaled range:    [{im_rescaled.min():.4f}, {im_rescaled.max():.4f}]")
-    if not is_euclid:
-        print(f"Range compressed:  [{im_range_compressed.min():.4f}, {im_range_compressed.max():.4f}]")
-    print("=" * 60)
+    fig, ax = plt.subplots(1, 1, figsize=(5, 5))
+    ax.imshow(im_cropped_2d, origin='lower', cmap='plasma', norm=ImageNormalize(im_cropped_2d, interval=PercentileInterval(99.5), stretch=AsinhStretch()))
 
-    # Comparison: preprocess_image_v2 with explicit bands
-    print("\n" + "=" * 60)
-    print("USING preprocess_image_v2 FUNCTION: preprocess_image_v2()")
-    print("=" * 60)
-    im_preprocessed = preprocess_image_v2(im_full, bands=[band])
-    print(f"Preprocessed image shape: {im_preprocessed.shape}")
-    print(f"Preprocessed image range: [{im_preprocessed.min():.4f}, {im_preprocessed.max():.4f}]")
-    print("=" * 60)
+    out_path = '/n03data/fontirro/plots_examples/cosmos_rotation/aligned_image_example_preprocess.png'
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    plt.savefig(out_path, dpi=300, bbox_inches='tight')
+
+    print("Saved figure.")
+
+
+    # Step 2: Rescale Euclid to COSMOS ZP (23.9); COSMOS passes through unchanged
+    # rescaler = RescaleToCOSMOS()
+    # im_rescaled = rescaler.forward(im_cropped.clone(), band)
+    # print(f"\n2. After rescale.forward (band={band}): {im_rescaled.shape}")
+    # print(f"   Range: [{im_rescaled.min():.4f}, {im_rescaled.max():.4f}]")
+
+    # Step 3: Range compression (skipped for Euclid — already compressed)
+    # is_euclid = band in EUCLID_ZP
+    # if not is_euclid:
+    #     range_compression_factor = 0.01
+    #     mult_factor = 10.0
+    #     range_compressor = RangeCompress(
+    #         range_compression_factor=range_compression_factor,
+    #         mult_factor=mult_factor,
+    #     )
+    #     im_range_compressed = range_compressor.forward(im_rescaled.clone())
+    #     print(f"\n3. After range_compress: {im_range_compressed.shape}")
+    #     print(f"   Range: [{im_range_compressed.min():.4f}, {im_range_compressed.max():.4f}]")
+    #     print(f"   range_compression_factor: {range_compression_factor}")
+    #     print(f"   mult_factor: {mult_factor}")
+    #     print(f"   Formula: arcsinh(x / {range_compression_factor}) * {range_compression_factor} * {mult_factor}")
+    # else:
+    #     im_range_compressed = im_rescaled
+    #     print(f"\n3. Range compression skipped (Euclid — already compressed)")
+
+    # # Summary
+    # print("\n" + "=" * 60)
+    # print("SUMMARY OF TRANSFORMATIONS")
+    # print("=" * 60)
+    # print(f"Original range:    [{im_full.min():.4f}, {im_full.max():.4f}]")
+    # print(f"Rescaled range:    [{im_rescaled.min():.4f}, {im_rescaled.max():.4f}]")
+    # if not is_euclid:
+    #     print(f"Range compressed:  [{im_range_compressed.min():.4f}, {im_range_compressed.max():.4f}]")
+    # print("=" * 60)
+
+    # # Comparison: preprocess_image_v2 with explicit bands
+    # print("\n" + "=" * 60)
+    # print("USING preprocess_image_v2 FUNCTION: preprocess_image_v2()")
+    # print("=" * 60)
+    # im_preprocessed = preprocess_image_v2(im_full, bands=[band])
+    # print(f"Preprocessed image shape: {im_preprocessed.shape}")
+    # print(f"Preprocessed image range: [{im_preprocessed.min():.4f}, {im_preprocessed.max():.4f}]")
+    # print("=" * 60)
 
 
 
