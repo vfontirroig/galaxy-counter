@@ -220,10 +220,10 @@ def main():
     args_list = [(i, ep, cp) for i, (ep, cp) in enumerate(zip(euclid_paths, cosmos_paths))]
 
     with h5py.File(OUTPUT_H5, "w") as f:
-        euc_ds = f.create_dataset("euclid_images", shape=(N_valid, 1, H_euc, W_euc),
-                                   maxshape=(N_valid, 1, H_euc, W_euc), chunks=True, dtype=np.float32)
-        cos_ds = f.create_dataset("cosmos_images", shape=(N_valid, 1, H_cos, W_cos),
-                                   maxshape=(N_valid, 1, H_cos, W_cos), chunks=True, dtype=np.float32)
+        euc_ds = f.create_dataset("euclid_images", shape=(N_valid, 1, EUCLID_CROP_SIZE, EUCLID_CROP_SIZE),
+                                   maxshape=(N_valid, 1, EUCLID_CROP_SIZE, EUCLID_CROP_SIZE), chunks=True, dtype=np.float32)
+        cos_ds = f.create_dataset("cosmos_images", shape=(N_valid, 1, COSMOS_CROP_SIZE, COSMOS_CROP_SIZE),
+                                   maxshape=(N_valid, 1, COSMOS_CROP_SIZE, COSMOS_CROP_SIZE), chunks=True, dtype=np.float32)
         cos_down_ds = f.create_dataset("cosmos_images_downscaled", shape=(N_valid, 1, H_SIZE, W_SIZE),
                                         maxshape=(N_valid, 1, H_SIZE, W_SIZE), chunks=True, dtype=np.float32)
         euc_up_ds = f.create_dataset("euclid_images_upscaled", shape=(N_valid, 1, H_SIZE, W_SIZE),
@@ -253,8 +253,8 @@ def main():
 
         N_final = write_idx
         if N_final < N_valid:
-            euc_ds.resize((N_final, 1, H_euc, W_euc))
-            cos_ds.resize((N_final, 1, H_cos, W_cos))
+            euc_ds.resize((N_final, 1, EUCLID_CROP_SIZE, EUCLID_CROP_SIZE))
+            cos_ds.resize((N_final, 1, COSMOS_CROP_SIZE, COSMOS_CROP_SIZE))
             cos_down_ds.resize((N_final, 1, H_SIZE, W_SIZE))
             euc_up_ds.resize((N_final, 1, H_SIZE, W_SIZE))
 
@@ -273,8 +273,8 @@ def main():
                 feat_grp.create_dataset(col, data=np.array(vals.astype(str).tolist(), dtype=object), dtype=dt)
         f.attrs["num_pairs"] = N_final
         f.attrs["num_channels"] = 1
-        f.attrs["euclid_shape"] = [H_euc, W_euc]
-        f.attrs["cosmos_shape"] = [H_cos, W_cos]
+        f.attrs["euclid_shape"] = [EUCLID_CROP_SIZE, EUCLID_CROP_SIZE]
+        f.attrs["cosmos_shape"] = [COSMOS_CROP_SIZE, COSMOS_CROP_SIZE]
         f.attrs["euclid_upscaled_shape"] = [H_SIZE, W_SIZE]
         f.attrs["cosmos_downscaled_shape"] = [H_SIZE, W_SIZE]
 
