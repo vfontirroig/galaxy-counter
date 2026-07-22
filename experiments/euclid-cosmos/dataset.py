@@ -157,10 +157,10 @@ def main():
     print(f"  Dataset: {dataset[0]}")
     
     
-    print(f"  Euclid shape: {input.shape}, range [{input.min():.3f}, {input.max():.3f}]")
-    print(f"  COSMOS shape: {cos.shape}, range [{cos.min():.3f}, {cos.max():.3f}]")
-    print(f" Euclid mean/std: {input.mean():.5f} / {input.std():.5f}")
-    print(f" COSMOS mean/std: {cos.mean():.5f} / {cos.std():.5f}")
+    # print(f"  Euclid shape: {input.shape}, range [{input.min():.3f}, {input.max():.3f}]")
+    # print(f"  COSMOS shape: {cos.shape}, range [{cos.min():.3f}, {cos.max():.3f}]")
+    # print(f" Euclid mean/std: {input.mean():.5f} / {input.std():.5f}")
+    # print(f" COSMOS mean/std: {cos.mean():.5f} / {cos.std():.5f}")
    
     # loader = DataLoader(dataset, batch_size=64, shuffle=True,
     #                     num_workers=2, collate_fn=collate_pairs,
