@@ -135,14 +135,16 @@ def compute_norm_stats(hdf5_path: str, n_samples: int = 10_000) -> dict:
 def main():
     from torch.utils.data import DataLoader
 
-    H5_PATH = "/n03data/fontirro/data_files/euclid_cosmos_pairs_vis_f115w.h5"
+    H5_PATH = "/n03data/fontirro/data_files/euclid_cosmos_pairs_vis_f150w_v2.h5"
 
-    #print("Computing normalization stats...")
-    #stats = compute_norm_stats(H5_PATH)
+    print("Computing normalization stats...")
+    stats = compute_norm_stats(H5_PATH)
+
     
     print("\nDataset loading...")
     dataset = EuclidCosmosDataset(H5_PATH)
     print(f"  Dataset size: {len(dataset)}")
+    print(f"stats: {stats}")
 
     #for only one galaxy sample, we can do:
     anchor, input, meta = dataset[0]
@@ -155,10 +157,10 @@ def main():
     print(f"  Dataset: {dataset[0]}")
     
     
-    # print(f"  Euclid shape: {input.shape}, range [{input.min():.3f}, {input.max():.3f}]")
-    # print(f"  COSMOS shape: {cos.shape}, range [{cos.min():.3f}, {cos.max():.3f}]")
-    # print(f" Euclid mean/std: {input.mean():.5f} / {input.std():.5f}")
-    # print(f" COSMOS mean/std: {cos.mean():.5f} / {cos.std():.5f}")
+    print(f"  Euclid shape: {input.shape}, range [{input.min():.3f}, {input.max():.3f}]")
+    print(f"  COSMOS shape: {cos.shape}, range [{cos.min():.3f}, {cos.max():.3f}]")
+    print(f" Euclid mean/std: {input.mean():.5f} / {input.std():.5f}")
+    print(f" COSMOS mean/std: {cos.mean():.5f} / {cos.std():.5f}")
    
     # loader = DataLoader(dataset, batch_size=64, shuffle=True,
     #                     num_workers=2, collate_fn=collate_pairs,
