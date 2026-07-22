@@ -296,6 +296,8 @@ def main():
     cropper = CenterCrop(crop_size=120)
     im_cropped = cropper(im_full)
     print(f"\n1. After cropper (crop_size=120): {im_cropped.shape}")
+    print(f"   Range: [{im_cropped.min():.4f}, {im_cropped.max():.4f}]")
+
 
     im_cropped_2d = im_cropped.squeeze().numpy()  # (1, 1, H, W) -> (H, W)
 
