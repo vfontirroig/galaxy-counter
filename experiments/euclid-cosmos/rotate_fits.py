@@ -81,6 +81,8 @@ def main():
 
     # print("Saved figure.")
 
+    #--------------------------------------------------------------------------------------------
+
     #Save all files from a directory. This case F150W.
 
     INPUT_DIR = '/n03data/fontirro/cutouts/cosmos/256_cutouts/f150w'
