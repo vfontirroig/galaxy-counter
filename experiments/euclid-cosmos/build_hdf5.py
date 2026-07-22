@@ -196,13 +196,13 @@ def main():
     # Quick sanity check on first valid pair
     # ------------------------------------------------------------------
     print("\nTesting first pair (sequential)...")
-    _, i, t_euc, t_cos, t_cos_down, t_euc_up, t_err = process_pair(
+    _, t_euc, t_cos, t_cos_down, t_euc_up, t_err = process_pair(
         (0, euclid_paths[0], cosmos_paths[0])
     )
     if t_err:
         print(f"[ERROR] First pair failed:\n{t_err}")
         sys.exit(1)
-    print(f"  euc [{t_euc.min():.4f}, {t_euc.max():.4f}]  euc_up [{t_euc_up.min():.4f}, {t_euc_up.max():.4f}]  cos [{t_cos.min():.4f}, {t_cos.max():.4f}]")
+    print(f"  euc [{t_euc.min():.4f}, {t_euc.max():.4f}]  euc_up [{t_euc_up.min():.4f}, {t_euc_up.max():.4f}]  cos [{t_cos.min():.4f}, {t_cos.max():.4f}]  cos_down [{t_cos_down.min():.4f}, {t_cos_down.max():.4f}]")
     print("OK.\n")
 
     H_euc, W_euc = get_spatial_size(euclid_paths[0], EUCLID_HDU)
