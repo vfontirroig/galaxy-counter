@@ -30,13 +30,13 @@ import os
 
 CATALOG_PATH = "/n03data/fontirro/data_files/cat_crossmatch_mag27_mag25.csv"  # path to the paired catalog
 
-EUCLID_COL = "40_file_euclid_vis"              # column name for the Euclid FITS file path
+EUCLID_COL = "50_file_euclid_vis"              # column name for the Euclid FITS file path
 COSMOS_COL = "file_cosmos_f150w"            # column name for the COSMOS FITS file path
 
-EUCLID_EXISTS_COL = "cutout_euc_40_vis"    # boolean column: True if Euclid cutout exists
+EUCLID_EXISTS_COL = "cutout_euc_50_vis"    # boolean column: True if Euclid cutout exists
 COSMOS_EXISTS_COL = "cutout_cos_256_rot_f150w"  # boolean column: True if COSMOS cutout exists
 
-EUCLID_DIR_PATH = "/n03data/fontirro/cutouts/euclid/40_cutouts/40_cutouts-vis"  # base directory for Euclid VIS cutouts.
+EUCLID_DIR_PATH = "/n03data/fontirro/cutouts/euclid/50_cutouts/vis"  # base directory for Euclid VIS cutouts.
 COSMOS_DIR_PATH = "/n03data/fontirro/cutouts/cosmos/256_cutouts_rotated/f150w/"  # base directory for COSMOS F150W cutouts.
 
 EUCLID_HDU = 1   # HDU index for Euclid data (usually 1 for science extension)
