@@ -202,7 +202,7 @@ def main():
     if t_err:
         print(f"[ERROR] First pair failed:\n{t_err}")
         sys.exit(1)
-    print(f"  euc [{t_euc.min()}, {t_euc.max()}]  euc_up [{t_euc_up.min():.4f}, {t_euc_up.max():.4f}]  cos [{t_cos.min():.4f}, {t_cos.max():.4f}]  cos_down [{t_cos_down.min():.4f}, {t_cos_down.max():.4f}]")
+    print(f"  euc [{t_euc.min()}, {t_euc.max()}]  euc_up [{t_euc_up.min()}, {t_euc_up.max()}]  cos [{t_cos.min():.4f}, {t_cos.max():.4f}]  cos_down [{t_cos_down.min():.4f}, {t_cos_down.max():.4f}]")
     print("OK.\n")
 
     H_euc, W_euc = get_spatial_size(euclid_paths[0], EUCLID_HDU)
