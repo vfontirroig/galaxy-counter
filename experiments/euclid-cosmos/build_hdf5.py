@@ -46,8 +46,13 @@ OUTPUT_H5 = "/n03data/fontirro/data_files/euclid_cosmos_pairs_vis_f150w_v2.h5"
 
 NUM_WORKERS = 16  # parallel threads for loading + preprocessing
 
-H_SIZE = 64  # target spatial size for both Euclid and COSMOS 
-W_SIZE = 64  # target spatial size for both Euclid and COSMOS 
+H_SIZE = 64  # target spatial size for both Euclid and COSMOS
+W_SIZE = 64  # target spatial size for both Euclid and COSMOS
+
+EUCLID_CROP_SIZE = 36   # center-crop size applied to Euclid VIS cutouts
+COSMOS_CROP_SIZE = 120  # center-crop size applied to COSMOS F150W cutouts (rotated —
+                         # too large a crop can dip into the NaN padding outside the
+                         # rotated footprint; see cosmos_nan_frac below)
 
 # ---------------------------------------------------------------------------
 
@@ -84,14 +89,27 @@ def euclid_zero_frac(path: str) -> float:
     return float(np.mean(data == 0))
 
 
+def cosmos_nan_frac(path: str, crop_size: int = COSMOS_CROP_SIZE) -> float:
+    """Return fraction of NaN pixels within the center crop_size region of a COSMOS
+    FITS cutout (numpy only, no torch). Rotated cutouts have NaN padding outside the
+    rotated footprint; this checks only the region process_pair actually crops to."""
+    with fits.open(path, memmap=False) as hdul:
+        data = hdul[COSMOS_HDU].data.astype(np.float32)
+    height, width = data.shape[-2], data.shape[-1]
+    start_y = (height - crop_size) // 2
+    start_x = (width - crop_size) // 2
+    crop = data[start_y:start_y + crop_size, start_x:start_x + crop_size]
+    return float(np.mean(np.isnan(crop)))
+
+
 def process_pair(args: tuple) -> tuple:
     """Load, preprocess, downscale cosmos, and upscale euclid. Returns (i, euc, cos, cos_down, euc_up, error)."""
     i, ep, cp  = args
     try:
         euc_tensor = load_fits(ep, EUCLID_HDU)
         cos_tensor = load_fits(cp, COSMOS_HDU)
-        euc = preprocess_image_v2(euc_tensor, crop_size= 36, bands=["VIS"]).squeeze(0).numpy()
-        cos = preprocess_image_v2(cos_tensor, crop_size=120, bands=["F150W"]).squeeze(0).numpy()
+        euc = preprocess_image_v2(euc_tensor, crop_size=EUCLID_CROP_SIZE, bands=["VIS"]).squeeze(0).numpy()
+        cos = preprocess_image_v2(cos_tensor, crop_size=COSMOS_CROP_SIZE, bands=["F150W"]).squeeze(0).numpy()
         cos_down = F.interpolate(
             torch.from_numpy(cos).unsqueeze(0), size=(H_SIZE, W_SIZE),
             mode="bilinear",
@@ -158,6 +176,21 @@ def main():
     if N_valid == 0:
         print("[ERROR] No valid pairs found — check EUCLID_HDU and file paths.")
         sys.exit(1)
+
+    # ------------------------------------------------------------------
+    # Check: how many COSMOS cutouts have NaN pixels within the center
+    # crop_size region actually used by process_pair. Rotated cutouts have
+    # NaN outside the rotated footprint; too large a crop can dip into it.
+    # Diagnostic only — does not filter anything (yet).
+    # ------------------------------------------------------------------
+    print(f"\nScanning {N_valid} COSMOS files for NaN pixels in the center {COSMOS_CROP_SIZE}x{COSMOS_CROP_SIZE} crop...")
+    with ThreadPoolExecutor(max_workers=NUM_WORKERS) as pool:
+        cosmos_nan_fracs = list(tqdm(
+            pool.map(cosmos_nan_frac, cosmos_paths),
+            total=N_valid, desc="Scanning", mininterval=5,
+        ))
+    n_with_nan = sum(1 for f in cosmos_nan_fracs if f > 0)
+    print(f"COSMOS files with at least one NaN pixel in crop: {n_with_nan}/{N_valid} ({100 * n_with_nan / N_valid:.2f}%)")
 
     # ------------------------------------------------------------------
     # Quick sanity check on first valid pair
