@@ -197,7 +197,7 @@ def main():
     # ------------------------------------------------------------------
     print("\nTesting first pair (sequential)...")
     _, t_euc, t_cos, t_cos_down, t_euc_up, t_err = process_pair(
-        (0, euclid_paths[0], cosmos_paths[0])
+        (3, euclid_paths[3], cosmos_paths[3])
     )
     if t_err:
         print(f"[ERROR] First pair failed:\n{t_err}")
