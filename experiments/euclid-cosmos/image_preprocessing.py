@@ -268,8 +268,6 @@ def main():
     import os
     from astropy.wcs import WCS
     from astropy.visualization import ImageNormalize, PercentileInterval, AsinhStretch
-    interval = MinMaxInterval()
-
 
     #EUCLID_FILE = "/n03data/fontirro/euclid/40_cutouts/40_cutouts-vis/cutout_process_013_68b1674fTILE_101544256_14974135090968736_149.741351_2.147102_cutout.fits"
     COSMOS_FILE = "/n03data/fontirro/cutouts/cosmos/256_cutouts_rotated/f150w/F150W_5.fits"
