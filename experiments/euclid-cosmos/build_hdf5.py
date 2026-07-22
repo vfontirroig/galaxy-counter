@@ -90,8 +90,8 @@ def process_pair(args: tuple) -> tuple:
     try:
         euc_tensor = load_fits(ep, EUCLID_HDU)
         cos_tensor = load_fits(cp, COSMOS_HDU)
-        euc = preprocess_image_v2(euc_tensor, bands=["VIS"]).squeeze(0).numpy()
-        cos = preprocess_image_v2(cos_tensor, bands=["F150W"]).squeeze(0).numpy()
+        euc = preprocess_image_v2(euc_tensor, crop_size= 40, bands=["VIS"]).squeeze(0).numpy()
+        cos = preprocess_image_v2(cos_tensor, crop_size=134, bands=["F150W"]).squeeze(0).numpy()
         cos_down = F.interpolate(
             torch.from_numpy(cos).unsqueeze(0), size=(H_SIZE, W_SIZE),
             mode="bilinear",

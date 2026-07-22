@@ -232,8 +232,9 @@ def preprocess_image_v2(
     # Pipeline Execution
 
     # 1. Crop (Default 120)
-    cropper = CenterCrop(crop_size=crop_size)
-    processed = cropper(image)
+    if crop_size is not None and crop_size > 0:
+        cropper = CenterCrop(crop_size=crop_size)
+        processed = cropper(image)
 
     # Clamp
     # clamper = Clamp()
