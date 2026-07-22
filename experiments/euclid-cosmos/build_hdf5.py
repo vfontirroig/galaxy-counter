@@ -217,70 +217,70 @@ def main():
     # count at the end so the catalogue only contains real cutouts.
     # ------------------------------------------------------------------
 
-    # args_list = [(i, ep, cp) for i, (ep, cp) in enumerate(zip(euclid_paths, cosmos_paths))]
+    args_list = [(i, ep, cp) for i, (ep, cp) in enumerate(zip(euclid_paths, cosmos_paths))]
 
-    # with h5py.File(OUTPUT_H5, "w") as f:
-    #     euc_ds = f.create_dataset("euclid_images", shape=(N_valid, 1, H_euc, W_euc),
-    #                                maxshape=(N_valid, 1, H_euc, W_euc), chunks=True, dtype=np.float32)
-    #     cos_ds = f.create_dataset("cosmos_images", shape=(N_valid, 1, H_cos, W_cos),
-    #                                maxshape=(N_valid, 1, H_cos, W_cos), chunks=True, dtype=np.float32)
-    #     cos_down_ds = f.create_dataset("cosmos_images_downscaled", shape=(N_valid, 1, H_SIZE, W_SIZE),
-    #                                     maxshape=(N_valid, 1, H_SIZE, W_SIZE), chunks=True, dtype=np.float32)
-    #     euc_up_ds = f.create_dataset("euclid_images_upscaled", shape=(N_valid, 1, H_SIZE, W_SIZE),
-    #                                   maxshape=(N_valid, 1, H_SIZE, W_SIZE), chunks=True, dtype=np.float32)
+    with h5py.File(OUTPUT_H5, "w") as f:
+        euc_ds = f.create_dataset("euclid_images", shape=(N_valid, 1, H_euc, W_euc),
+                                   maxshape=(N_valid, 1, H_euc, W_euc), chunks=True, dtype=np.float32)
+        cos_ds = f.create_dataset("cosmos_images", shape=(N_valid, 1, H_cos, W_cos),
+                                   maxshape=(N_valid, 1, H_cos, W_cos), chunks=True, dtype=np.float32)
+        cos_down_ds = f.create_dataset("cosmos_images_downscaled", shape=(N_valid, 1, H_SIZE, W_SIZE),
+                                        maxshape=(N_valid, 1, H_SIZE, W_SIZE), chunks=True, dtype=np.float32)
+        euc_up_ds = f.create_dataset("euclid_images_upscaled", shape=(N_valid, 1, H_SIZE, W_SIZE),
+                                      maxshape=(N_valid, 1, H_SIZE, W_SIZE), chunks=True, dtype=np.float32)
 
-    #     kept_euclid_paths = []
-    #     kept_cosmos_paths = []
-    #     kept_cat_indices  = []
-    #     write_idx = 0
-    #     skipped = 0
-    #     with ProcessPoolExecutor(max_workers=NUM_WORKERS) as executor:
-    #         results = executor.map(process_pair, args_list, chunksize=100)
-    #         for result in tqdm(results, total=N_valid, desc="Processing", mininterval=60, dynamic_ncols=False):
-    #             i, euc, cos, cos_down, euc_up, err = result
-    #             if err:
-    #                 print(f"\n  [WARN] skipping pair {i}: {err}")
-    #                 skipped += 1
-    #                 continue
-    #             euc_ds[write_idx] = euc
-    #             cos_ds[write_idx] = cos
-    #             cos_down_ds[write_idx] = cos_down
-    #             euc_up_ds[write_idx] = euc_up
-    #             kept_euclid_paths.append(euclid_paths[i])
-    #             kept_cosmos_paths.append(cosmos_paths[i])
-    #             kept_cat_indices.append(i)
-    #             write_idx += 1
+        kept_euclid_paths = []
+        kept_cosmos_paths = []
+        kept_cat_indices  = []
+        write_idx = 0
+        skipped = 0
+        with ProcessPoolExecutor(max_workers=NUM_WORKERS) as executor:
+            results = executor.map(process_pair, args_list, chunksize=100)
+            for result in tqdm(results, total=N_valid, desc="Processing", mininterval=60, dynamic_ncols=False):
+                i, euc, cos, cos_down, euc_up, err = result
+                if err:
+                    print(f"\n  [WARN] skipping pair {i}: {err}")
+                    skipped += 1
+                    continue
+                euc_ds[write_idx] = euc
+                cos_ds[write_idx] = cos
+                cos_down_ds[write_idx] = cos_down
+                euc_up_ds[write_idx] = euc_up
+                kept_euclid_paths.append(euclid_paths[i])
+                kept_cosmos_paths.append(cosmos_paths[i])
+                kept_cat_indices.append(i)
+                write_idx += 1
 
-    #     N_final = write_idx
-    #     if N_final < N_valid:
-    #         euc_ds.resize((N_final, 1, H_euc, W_euc))
-    #         cos_ds.resize((N_final, 1, H_cos, W_cos))
-    #         cos_down_ds.resize((N_final, 1, H_SIZE, W_SIZE))
-    #         euc_up_ds.resize((N_final, 1, H_SIZE, W_SIZE))
+        N_final = write_idx
+        if N_final < N_valid:
+            euc_ds.resize((N_final, 1, H_euc, W_euc))
+            cos_ds.resize((N_final, 1, H_cos, W_cos))
+            cos_down_ds.resize((N_final, 1, H_SIZE, W_SIZE))
+            euc_up_ds.resize((N_final, 1, H_SIZE, W_SIZE))
 
-    #     cat_grp = f.create_group("catalog")
-    #     dt = h5py.string_dtype()
-    #     cat_grp.create_dataset("euclid_paths", data=np.array(kept_euclid_paths, dtype=object), dtype=dt)
-    #     cat_grp.create_dataset("cosmos_paths", data=np.array(kept_cosmos_paths, dtype=object), dtype=dt)
+        cat_grp = f.create_group("catalog")
+        dt = h5py.string_dtype()
+        cat_grp.create_dataset("euclid_paths", data=np.array(kept_euclid_paths, dtype=object), dtype=dt)
+        cat_grp.create_dataset("cosmos_paths", data=np.array(kept_cosmos_paths, dtype=object), dtype=dt)
 
-    #     kept_catalog = catalog.iloc[kept_cat_indices].reset_index(drop=True)
-    #     feat_grp = cat_grp.create_group("features")
-    #     for col in kept_catalog.columns:
-    #         vals = kept_catalog[col]
-    #         try:
-    #             feat_grp.create_dataset(col, data=vals.to_numpy(dtype=np.float32, na_value=np.nan))
-    #         except (ValueError, TypeError):
-    #             feat_grp.create_dataset(col, data=np.array(vals.astype(str).tolist(), dtype=object), dtype=dt)
-    #     f.attrs["num_pairs"] = N_final
-    #     f.attrs["num_channels"] = 1
-    #     f.attrs["euclid_shape"] = [H_euc, W_euc]
-    #     f.attrs["cosmos_shape"] = [H_cos, W_cos]
-    #     f.attrs["euclid_upscaled_shape"] = [H_SIZE, W_SIZE]
-    #     f.attrs["cosmos_downscaled_shape"] = [H_SIZE, W_SIZE]
+        kept_catalog = catalog.iloc[kept_cat_indices].reset_index(drop=True)
+        feat_grp = cat_grp.create_group("features")
+        for col in kept_catalog.columns:
+            vals = kept_catalog[col]
+            try:
+                feat_grp.create_dataset(col, data=vals.to_numpy(dtype=np.float32, na_value=np.nan))
+            except (ValueError, TypeError):
+                feat_grp.create_dataset(col, data=np.array(vals.astype(str).tolist(), dtype=object), dtype=dt)
+        f.attrs["num_pairs"] = N_final
+        f.attrs["num_channels"] = 1
+        f.attrs["euclid_shape"] = [H_euc, W_euc]
+        f.attrs["cosmos_shape"] = [H_cos, W_cos]
+        f.attrs["euclid_upscaled_shape"] = [H_SIZE, W_SIZE]
+        f.attrs["cosmos_downscaled_shape"] = [H_SIZE, W_SIZE]
 
-    # print(f"\nDone. {N_final}/{N_valid} pairs written to {OUTPUT_H5}")
-    # if skipped:
-    #     print(f"  {skipped} pairs skipped due to processing errors and dropped from the catalogue.")
+    print(f"\nDone. {N_final}/{N_valid} pairs written to {OUTPUT_H5}")
+    if skipped:
+        print(f"  {skipped} pairs skipped due to processing errors and dropped from the catalogue.")
 
 
 if __name__ == "__main__":
