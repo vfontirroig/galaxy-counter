@@ -16,4 +16,4 @@ set -euo pipefail
 # unreachable from compute nodes and silently falls through PATH to the
 # system platform-python instead. Call the venv's python3 directly via the
 # working /n03data/... path so it resolves the venv's own site-packages.
-python /n03data/fontirro/galaxy-counter/experiments/euclid-cosmos/train.py
+python /n03data/fontirro/euclid-cosmos/galaxy-counter/experiments/euclid-cosmos/train.py
