@@ -117,7 +117,7 @@ class EuclidCosmosModel(ConditionalFlowMatchingModule):
             if n == 1:
                 axes = axes[None, :]
             for j, title in enumerate([t0, t1, t2]):
-                axes[0, j].set_title(title, fontsize=10)
+                axes[0, j].set_title(title, fontsize=14)
             for i in range(n):
                 for j, img in enumerate([con[i], generated[i], anc[i]]):
                     arr = img.squeeze().cpu().float().numpy()
@@ -128,7 +128,7 @@ class EuclidCosmosModel(ConditionalFlowMatchingModule):
                                 transform=axes[i, 0].transAxes)
 
             tag = dir_label.replace(" ", "").replace("to", "-")
-            fig.suptitle(f"{dir_label}  |  step {step}", fontsize=12, y=0.98)
+            fig.suptitle(f"{dir_label}  |  step {step}", fontsize=18, y=0.98)
             plt.tight_layout(rect=[0, 0, 1, 0.95])
             fname = os.path.join(self.sample_dir, f"{tag}_step={step:07d}.png")
             plt.savefig(fname, dpi=100, bbox_inches="tight")
