@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #SBATCH --job-name=euclid_cosmos_train
-#SBATCH --output=/n03data/fontirro/logs/train_%j.out
-#SBATCH --error=/n03data/fontirro/logs/train_%j.err
+#SBATCH --output=/n03data/fontirro/euclid-cosmos/logs/train_%j.out
+#SBATCH --error=/n03data/fontirro/euclid-cosmos/logs/train_%j.err
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16       # matches NUM_WORKERS in train.py
 #SBATCH --mem=32G
