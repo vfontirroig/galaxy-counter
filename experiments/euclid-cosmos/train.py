@@ -1,7 +1,6 @@
 """
-TEST!!!!!!!!
 
-Train the flow-matching model on paired Euclid (VIS) x COSMOS (F115W) cutouts.
+Train the flow-matching model on paired Euclid (VIS) x COSMOS (F150W) cutouts.
 
 Phase 1 (this script): simple pairs, no precomputed same-instrument neighbors.
   - encoder_1 conditions on the COSMOS counterpart of the same galaxy.
@@ -118,7 +117,7 @@ class EuclidCosmosModel(ConditionalFlowMatchingModule):
             if n == 1:
                 axes = axes[None, :]
             for j, title in enumerate([t0, t1, t2]):
-                axes[0, j].set_title(title, fontsize=9)
+                axes[0, j].set_title(title, fontsize=10)
             for i in range(n):
                 for j, img in enumerate([con[i], generated[i], anc[i]]):
                     arr = img.squeeze().cpu().float().numpy()
@@ -129,8 +128,8 @@ class EuclidCosmosModel(ConditionalFlowMatchingModule):
                                 transform=axes[i, 0].transAxes)
 
             tag = dir_label.replace(" ", "").replace("to", "-")
-            fig.suptitle(f"{dir_label}  |  step {step}", fontsize=10, y=0.98)
-            plt.tight_layout()
+            fig.suptitle(f"{dir_label}  |  step {step}", fontsize=12, y=0.98)
+            plt.tight_layout(rect=[0, 0, 1, 0.95])
             fname = os.path.join(self.sample_dir, f"{tag}_step={step:07d}.png")
             plt.savefig(fname, dpi=100, bbox_inches="tight")
             plt.close()
@@ -251,7 +250,7 @@ def main():
     model = EuclidCosmosModel(
         sample_dir=os.path.join(CKPT_DIR, "samples"),
         in_channels=1,            # Euclid VIS: 1 channel
-        cond_channels=1,          # COSMOS F115W: 1 channel
+        cond_channels=1,          # COSMOS F150W: 1 channel
         image_size=IMAGE_SIZE,
         model_channels=128,
         channel_mult=(1, 2, 4, 4),
@@ -300,7 +299,7 @@ def main():
     )
 
     # Set to the latest checkpoint path to resume, or None to start fresh
-    RESUME_FROM = None
+    RESUME_FROM = "/n03data/fontirro/checkpoints/euclid-cosmos-vis-f150w/test-5-phase1/latest-step=step=40000.ckpt"
     trainer.fit(model, train_loader, val_loader, ckpt_path=RESUME_FROM)
 
 
