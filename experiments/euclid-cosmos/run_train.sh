@@ -8,7 +8,6 @@
 #SBATCH --gres=gpu:L40S:1
 #SBATCH --time=2-00:00:00
 #SBATCH --partition=pscompl      # change to your GPU partition
-#SBATCH --chdir=/n03data/fontirro/galaxy-counter
 set -euo pipefail
 
 # Don't `source .../activate` — the venv's activate script bakes in the
