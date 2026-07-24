@@ -89,11 +89,11 @@ class EuclidCosmosModel(ConditionalFlowMatchingModule):
 
         # one plot per direction, containing only rows that match that direction
         direction_cfg = {
-            "euclid": ("COSMOS to Euclid", "COSMOS input", "Generated Euclid", "Real Euclid"),
-            "cosmos": ("Euclid to COSMOS", "Euclid input", "Generated COSMOS", "Real COSMOS"),
+            "euclid": ("COSMOS to Euclid", "COSMOS input", "Generated Euclid", "Real Euclid", "Residual (Gen - Real)"),
+            "cosmos": ("Euclid to COSMOS", "Euclid input", "Generated COSMOS", "Real COSMOS", "Residual (Gen - Real)"),
         }
 
-        for survey, (dir_label, t0, t1, t2) in direction_cfg.items():
+        for survey, (dir_label, t0, t1, t2, t3) in direction_cfg.items():
             idx = [i for i, s in enumerate(surveys) if s == survey][:8]
             if not idx:
                 continue
@@ -113,23 +113,29 @@ class EuclidCosmosModel(ConditionalFlowMatchingModule):
                     num_steps=self.n_val_steps,
                 )
 
-            fig, axes = plt.subplots(n, 3, figsize=(7, 2.5 * n))
+            fig, axes = plt.subplots(n, 4, figsize=(7, 2.5 * n))
             if n == 1:
                 axes = axes[None, :]
-            for j, title in enumerate([t0, t1, t2]):
+            for j, title in enumerate([t0, t1, t2, t3]):
                 axes[0, j].set_title(title, fontsize=14)
             for i in range(n):
                 for j, img in enumerate([con[i], generated[i], anc[i]]):
                     arr = img.squeeze().cpu().float().numpy()
-                    axes[i, j].imshow(arr, cmap="gray")
+                    axes[i, j].imshow(arr, cmap="plasma")
                     axes[i, j].axis("off")
+
+                residual = (generated[i] - anc[i]).squeeze().cpu().float().numpy()
+                vmax = np.abs(residual).max()
+                axes[i, 3].imshow(residual, cmap="coolwarm", vmin=-vmax, vmax=vmax)
+                axes[i, 3].axis("off")
+
                 axes[i, 0].text(0.02, 0.98, f"idx={ids[i]}", fontsize=20,
                                 ha="left", va="top", color="magenta",
                                 transform=axes[i, 0].transAxes)
 
             tag = dir_label.replace(" ", "").replace("to", "-")
             fig.suptitle(f"{dir_label}  |  step {step}", fontsize=18, y=0.98)
-            plt.tight_layout(rect=[0, 0, 1, 0.95])
+            plt.tight_layout(rect=[0, 0, 1, 0.97])
             fname = os.path.join(self.sample_dir, f"{tag}_step={step:07d}.png")
             plt.savefig(fname, dpi=100, bbox_inches="tight")
             plt.close()

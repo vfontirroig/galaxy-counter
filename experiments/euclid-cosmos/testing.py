@@ -4,9 +4,9 @@ Test the trained Euclid x COSMOS flow-matching model on the held-out test set.
 Loads the test indices saved by train.py, generates images, and reports MSE.
 Figure columns depend on direction:
   cosmos-to-euclid:
-      [COSMOS input | Generated Euclid | Real Euclid]
+      [COSMOS input | Generated Euclid | Real Euclid | Residual]
   euclid-to-cosmos:
-      [Euclid input | Generated COSMOS | Real COSMOS]
+      [Euclid input | Generated COSMOS | Real COSMOS | Residual]
 
 Usage:
     python experiments/euclid-cosmos/testing.py \
@@ -38,9 +38,9 @@ from train import EuclidCosmosModel, collate_fn
 
 def show_image(ax, img_tensor, title=None):
     img = img_tensor.squeeze().cpu().float().numpy()
-    ax.imshow(img, cmap="gray")
+    ax.imshow(img, cmap="plasma")
     if title:
-        ax.set_title(title, fontsize=9)
+        ax.set_title(title, fontsize=14)
     ax.axis("off")
 
 
@@ -104,12 +104,12 @@ def main():
 
     # --- Run inference over the full test set ---
     all_mse = []
-    plot_input, plot_generated, plot_target = [], [], []
+    plot_input, plot_generated, plot_target, plot_metadata = [], [], [], []
 
     print("Running inference...")
     offset = 0
     with torch.no_grad():
-        for batch_idx, (euclid, cosmos, _, masks, _) in enumerate(loader):
+        for batch_idx, (euclid, cosmos, _, masks, metadata) in enumerate(loader):
             euclid = euclid.to(device)
             cosmos = cosmos.to(device)
             masks  = masks.to(device)
@@ -147,6 +147,7 @@ def main():
                 plot_input     = cond.cpu()
                 plot_generated = generated.cpu()
                 plot_target    = anchor.cpu()
+                plot_metadata  = metadata
 
     all_mse = torch.cat(all_mse)
     print(f"\n=== Test Results ({args.direction}) ===")
@@ -157,28 +158,38 @@ def main():
 
     # --- Figure ---
     if args.direction == "cosmos-to-euclid":
-        col_titles = ["COSMOS input", "Generated Euclid", "Real Euclid"]
+        col_titles = ["COSMOS input", "Generated Euclid", "Real Euclid", "Residual (Gen - Real)"]
     else:
-        col_titles = ["Euclid input", "Generated COSMOS", "Real COSMOS"]
+        col_titles = ["Euclid input", "Generated COSMOS", "Real COSMOS", "Residual (Gen - Real)"]
 
     n = min(args.n_plot, len(plot_input))
-    fig, axes = plt.subplots(n, 3, figsize=(7, 2.5 * n))
+    ids = [m["idx"] for m in plot_metadata[:n]]
+    fig, axes = plt.subplots(n, 4, figsize=(7, 2.5 * n))
     if n == 1:
         axes = axes[None, :]
 
     for j, title in enumerate(col_titles):
-        axes[0, j].set_title(title, fontsize=9)
+        axes[0, j].set_title(title, fontsize=14)
 
     for i in range(n):
         show_image(axes[i, 0], plot_input[i])
         show_image(axes[i, 1], plot_generated[i])
         show_image(axes[i, 2], plot_target[i])
 
+        residual = (plot_generated[i] - plot_target[i]).squeeze().float().numpy()
+        vmax = np.abs(residual).max()
+        axes[i, 3].imshow(residual, cmap="coolwarm", vmin=-vmax, vmax=vmax)
+        axes[i, 3].axis("off")
+
+        axes[i, 0].text(0.02, 0.98, f"idx={ids[i]}", fontsize=20,
+                        ha="left", va="top", color="magenta",
+                        transform=axes[i, 0].transAxes)
+
     fig.suptitle(
         f"Test set ({args.direction})  |  Mean MSE = {all_mse.mean():.5f}  |  N = {len(all_mse)}",
-        fontsize=10,
+        fontsize=18, y=0.98,
     )
-    plt.tight_layout()
+    plt.tight_layout(rect=[0, 0, 1, 0.97])
     plt.savefig(args.out, dpi=150, bbox_inches="tight")
     plt.close()
     print(f"Figure saved: {args.out}")
