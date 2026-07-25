@@ -152,9 +152,9 @@ def main():
                          fontsize=7, color=color, fontweight="bold")
 
     legend_handles = [
-        Line2D([0], [0], marker="o", color="w", markerfacecolor="steelblue",  markersize=8, label="Euclid VIS"),
-        Line2D([0], [0], marker="o", color="w", markerfacecolor="darkorange", markersize=8, label="COSMOS F150W"),
-        Line2D([0], [0], marker="*", color="w", markerfacecolor="gray", markersize=10,
+        Line2D([0], [0], marker="o", color="w", markerfacecolor="steelblue",  markersize=10, label="Euclid VIS"),
+        Line2D([0], [0], marker="o", color="w", markerfacecolor="darkorange", markersize=10, label="COSMOS F150W"),
+        Line2D([0], [0], marker="*", color="w", markerfacecolor="gray", markersize=12,
                markeredgecolor="black", label=f"{len(pair_ids)} highlighted pairs"),
     ]
     ax1.legend(handles=legend_handles, fontsize=14)
