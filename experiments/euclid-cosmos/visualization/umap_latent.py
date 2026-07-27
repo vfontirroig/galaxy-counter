@@ -192,11 +192,12 @@ def main():
     # --- Separate cutouts figure ---
     if args.out_cutouts is not None:
         print("Loading cutout images for highlighted pairs...")
-        hl_euclid_imgs, hl_cosmos_imgs = [], []
+        hl_euclid_imgs, hl_cosmos_imgs, hl_ids = [], [], []
         for pid in pair_ids:
-            e_img, c_img, _ = subset[pid]
+            e_img, c_img, meta = subset[pid]
             hl_euclid_imgs.append(_percentile_scale(e_img.squeeze(0).numpy()))
             hl_cosmos_imgs.append(_percentile_scale(c_img.squeeze(0).numpy()))
+            hl_ids.append(meta["idx"])
 
         n_pairs = len(pair_ids)
         fig2, axes = plt.subplots(2, n_pairs, figsize=(2.5 * n_pairs, 5.5))
@@ -215,6 +216,9 @@ def main():
                     spine.set_linewidth(3)
                 if row == 0:
                     ax.set_title(f"Pair {k + 1}", color=color, fontsize=18, fontweight="bold")
+                    ax.text(0.02, 0.98, f"idx={hl_ids[k]}", fontsize=10,
+                            ha="left", va="top", color="magenta",
+                            transform=ax.transAxes)
 
         for row, label in enumerate(row_labels):
             axes[row, 0].set_ylabel(label, fontsize=20)
