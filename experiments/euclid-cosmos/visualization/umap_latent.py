@@ -136,7 +136,7 @@ def main():
     # --- UMAP plot ---
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
 
-    kw = dict(s=10, alpha=0.5, rasterized=True)
+    kw = dict(s=12, alpha=0.5, rasterized=True)
     ax1.scatter(euc_u1[:, 0], euc_u1[:, 1], c="steelblue",  label="Euclid VIS", **kw)
     ax1.scatter(cos_u1[:, 0], cos_u1[:, 1], c="darkorange", label="COSMOS F150W", **kw)
 
