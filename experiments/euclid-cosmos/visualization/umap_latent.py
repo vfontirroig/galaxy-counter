@@ -216,7 +216,7 @@ def main():
                     spine.set_linewidth(3)
                 if row == 0:
                     ax.set_title(f"Pair {k + 1}", color=color, fontsize=18, fontweight="bold")
-                    ax.text(0.02, 0.98, f"idx={hl_ids[k]}", fontsize=40,
+                    ax.text(0.02, 0.98, f"idx={hl_ids[k]}", fontsize=30,
                             ha="left", va="top", color="magenta",
                             transform=ax.transAxes)
 
