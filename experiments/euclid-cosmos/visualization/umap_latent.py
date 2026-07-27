@@ -136,7 +136,7 @@ def main():
     # --- UMAP plot --- encoder 1
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
 
-    kw = dict(s=15, alpha=0.5, rasterized=True)
+    kw = dict(s=18, alpha=0.5, rasterized=True)
     ax1.scatter(euc_u1[:, 0], euc_u1[:, 1], c="steelblue",  label="Euclid VIS", **kw)
     ax1.scatter(cos_u1[:, 0], cos_u1[:, 1], c="darkorange", label="COSMOS F150W", **kw)
 
@@ -157,7 +157,7 @@ def main():
         Line2D([0], [0], marker="*", color="w", markerfacecolor="gray", markersize=12,
                markeredgecolor="black", label=f"{len(pair_ids)} highlighted pairs"),
     ]
-    ax1.legend(handles=legend_handles, fontsize=14)
+    ax1.legend(handles=legend_handles, fontsize=12)
     ax1.set_title("encoder_1 — same galaxy (physics)", fontsize=18)
     ax1.set_xlabel("UMAP 1", fontsize=15)
     ax1.set_ylabel("UMAP 2", fontsize=15)
@@ -176,12 +176,12 @@ def main():
         for x, y in [(euc_u2[pid, 0], euc_u2[pid, 1]),
                      (cos_u2[pid, 0], cos_u2[pid, 1])]:
             ax2.annotate(label, xy=(x, y), xytext=(4, 4), textcoords="offset points",
-                         fontsize=8, color=color, fontweight="bold")
+                         fontsize=10, color=color, fontweight="bold")
 
     ax2.set_title("encoder_2 — same instrument", fontsize=18)
     ax2.set_xlabel("UMAP 1", fontsize=15)
     ax2.set_ylabel("UMAP 2", fontsize=15)
-    ax2.legend(handles=legend_handles, fontsize=14)
+    ax2.legend(handles=legend_handles, fontsize=12)
 
     fig.suptitle(f"Latent space UMAP  |  N = {N} galaxy pairs", fontsize=15)
     plt.tight_layout()
