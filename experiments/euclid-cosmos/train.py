@@ -220,9 +220,8 @@ def main():
     n_test    = int(n_total * TEST_RATIO)
     n_val     = int(n_total * VAL_RATIO)
     n_train   = n_total - n_val - n_test
-    #generator = torch.Generator().manual_seed(42)
-    #train_ds, val_ds, test_ds = random_split(dataset, [n_train, n_val, n_test], generator=generator)
-    train_ds, val_ds, test_ds = random_split(dataset, [n_train, n_val, n_test])
+    generator = torch.Generator().manual_seed(123)
+    train_ds, val_ds, test_ds = random_split(dataset, [n_train, n_val, n_test], generator=generator)
 
     print(f"Dataset: {n_total} pairs → {n_train} train / {n_val} val / {n_test} test")
 
