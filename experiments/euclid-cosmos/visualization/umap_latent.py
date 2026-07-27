@@ -133,10 +133,10 @@ def main():
     pair_ids   = rng.choice(N, size=min(args.n_highlight, N), replace=False)
     pair_colors = plt.cm.tab10(np.linspace(0, 1, len(pair_ids)))
 
-    # --- UMAP plot ---
+    # --- UMAP plot --- encoder 1
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
 
-    kw = dict(s=12, alpha=0.5, rasterized=True)
+    kw = dict(s=15, alpha=0.5, rasterized=True)
     ax1.scatter(euc_u1[:, 0], euc_u1[:, 1], c="steelblue",  label="Euclid VIS", **kw)
     ax1.scatter(cos_u1[:, 0], cos_u1[:, 1], c="darkorange", label="COSMOS F150W", **kw)
 
@@ -149,7 +149,7 @@ def main():
         for x, y in [(euc_u1[pid, 0], euc_u1[pid, 1]),
                      (cos_u1[pid, 0], cos_u1[pid, 1])]:
             ax1.annotate(label, xy=(x, y), xytext=(4, 4), textcoords="offset points",
-                         fontsize=8, color=color, fontweight="bold")
+                         fontsize=10, color=color, fontweight="bold")
 
     legend_handles = [
         Line2D([0], [0], marker="o", color="w", markerfacecolor="steelblue",  markersize=10, label="Euclid VIS"),
@@ -161,6 +161,8 @@ def main():
     ax1.set_title("encoder_1 — same galaxy (physics)", fontsize=18)
     ax1.set_xlabel("UMAP 1", fontsize=15)
     ax1.set_ylabel("UMAP 2", fontsize=15)
+
+    # --- UMAP plot --- encoder 2
 
     ax2.scatter(euc_u2[:, 0], euc_u2[:, 1], c="steelblue",  label="Euclid VIS", **kw)
     ax2.scatter(cos_u2[:, 0], cos_u2[:, 1], c="darkorange", label="COSMOS F150W", **kw)
@@ -205,14 +207,14 @@ def main():
         for k, (pid, color) in enumerate(zip(pair_ids, pair_colors)):
             for row, img in enumerate([hl_euclid_imgs[k], hl_cosmos_imgs[k]]):
                 ax = axes[row, k]
-                ax.imshow(img, cmap="gray", origin="lower")
+                ax.imshow(img, cmap="plasma", origin="lower")
                 ax.set_xticks([])
                 ax.set_yticks([])
                 for spine in ax.spines.values():
                     spine.set_edgecolor(color)
                     spine.set_linewidth(3)
                 if row == 0:
-                    ax.set_title(f"Pair {k + 1}", color=color, fontsize=14, fontweight="bold")
+                    ax.set_title(f"Pair {k + 1}", color=color, fontsize=18, fontweight="bold")
 
         for row, label in enumerate(row_labels):
             axes[row, 0].set_ylabel(label, fontsize=20)
