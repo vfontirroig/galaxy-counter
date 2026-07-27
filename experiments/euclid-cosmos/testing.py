@@ -164,7 +164,7 @@ def main():
 
     n = min(args.n_plot, len(plot_input))
     ids = [m["idx"] for m in plot_metadata[:n]]
-    fig, axes = plt.subplots(n, 4, figsize=(7, 10), constrained_layout=True)
+    fig, axes = plt.subplots(n, 4, figsize=(9, 2.5 * n))
     if n == 1:
         axes = axes[None, :]
 

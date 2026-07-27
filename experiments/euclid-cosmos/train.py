@@ -113,7 +113,7 @@ class EuclidCosmosModel(ConditionalFlowMatchingModule):
                     num_steps=self.n_val_steps,
                 )
 
-            fig, axes = plt.subplots(n, 4, figsize=(7, 2.5 * n))
+            fig, axes = plt.subplots(n, 4, figsize=(9, 2.5 * n))
             if n == 1:
                 axes = axes[None, :]
             for j, title in enumerate([t0, t1, t2, t3]):
