@@ -164,7 +164,7 @@ def main():
 
     n = min(args.n_plot, len(plot_input))
     ids = [m["idx"] for m in plot_metadata[:n]]
-    fig, axes = plt.subplots(n, 4, figsize=(7, 2.5 * n))
+    fig, axes = plt.subplots(n, 4, figsize=(7, 12), constrained_layout=True)
     if n == 1:
         axes = axes[None, :]
 
@@ -189,7 +189,7 @@ def main():
         f"Test set ({args.direction})  |  Mean MSE = {all_mse.mean():.5f}  |  N = {len(all_mse)}",
         fontsize=18, y=0.98,
     )
-    plt.tight_layout(rect=[0, 0, 1, 0.97])
+    plt.tight_layout(rect=[0, 0, 1, 0.99])
     plt.savefig(args.out, dpi=150, bbox_inches="tight")
     plt.close()
     print(f"Figure saved: {args.out}")
