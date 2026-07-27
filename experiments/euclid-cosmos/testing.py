@@ -177,11 +177,12 @@ def main():
         show_image(axes[i, 2], plot_target[i])
 
         residual = (plot_generated[i] - plot_target[i]).squeeze().float().numpy()
-        vmax = np.abs(residual).max()
-        axes[i, 3].imshow(residual, cmap="coolwarm", vmin=-vmax, vmax=vmax)
+        #vmax = np.abs(residual).max()
+        im = axes[i, 3].imshow(residual, cmap="coolwarm")
         axes[i, 3].axis("off")
+        fig.colorbar(im, ax=axes[i, 3], fraction=0.046, pad=0.04)
 
-        axes[i, 0].text(0.02, 0.98, f"idx={ids[i]}", fontsize=10,
+        axes[i, 0].text(0.02, 0.98, f"idx={ids[i]}", fontsize=18,
                         ha="left", va="top", color="magenta",
                         transform=axes[i, 0].transAxes)
 
