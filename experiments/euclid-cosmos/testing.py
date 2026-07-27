@@ -181,7 +181,7 @@ def main():
         axes[i, 3].imshow(residual, cmap="coolwarm", vmin=-vmax, vmax=vmax)
         axes[i, 3].axis("off")
 
-        axes[i, 0].text(0.02, 0.98, f"idx={ids[i]}", fontsize=20,
+        axes[i, 0].text(0.02, 0.98, f"idx={ids[i]}", fontsize=10,
                         ha="left", va="top", color="magenta",
                         transform=axes[i, 0].transAxes)
 
