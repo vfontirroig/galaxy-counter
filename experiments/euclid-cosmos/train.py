@@ -44,10 +44,13 @@ class EuclidCosmosModel(ConditionalFlowMatchingModule):
     Flow-matching model for Euclid VIS → COSMOS F150W and vice versa. 
     """
 
-    def __init__(self, *args, sample_dir=None, n_val_steps=50, **kwargs):
+    def __init__(self, *args, sample_dir=None, n_val_steps=50,
+                 input_plot_dir=None, input_plot_every_n_steps=500, **kwargs):
         super().__init__(*args, **kwargs)
         self.sample_dir = sample_dir
         self.n_val_steps = n_val_steps
+        self.input_plot_dir = input_plot_dir
+        self.input_plot_every_n_steps = input_plot_every_n_steps
         self._fixed_val_batch = None
 
     def on_train_start(self) -> None:
@@ -59,6 +62,44 @@ class EuclidCosmosModel(ConditionalFlowMatchingModule):
             for i in range(torch.cuda.device_count()):
                 print(f"  GPU {i}: {torch.cuda.get_device_name(i)}")
         print(f"{'='*60}\n")
+
+    def training_step(self, batch, batch_idx):
+        if (self.input_plot_dir is not None and self.trainer.is_global_zero
+                and self.trainer.global_step % self.input_plot_every_n_steps == 0):
+            self._plot_training_inputs(batch)
+        return super().training_step(batch, batch_idx)
+
+    def _plot_training_inputs(self, batch) -> None:
+        """Diagnostic plot of the raw batch fed to the model at this step:
+        the same-galaxy conditioning image, the same-instrument neighbor, and
+        the anchor (generation target) — no model forward involved."""
+        anchor, cond, sameins, _, metadata = batch
+        n = min(8, anchor.shape[0])
+        os.makedirs(self.input_plot_dir, exist_ok=True)
+        step = self.trainer.global_step
+
+        col_titles = ["Samegal cond", "Sameins neighbor", "Anchor (target)"]
+        fig, axes = plt.subplots(n, 3, figsize=(7, 2.5 * n))
+        if n == 1:
+            axes = axes[None, :]
+        for j, title in enumerate(col_titles):
+            axes[0, j].set_title(title, fontsize=14)
+        for i in range(n):
+            imgs = [cond[i], sameins[i, 0], anchor[i]]
+            for j, img in enumerate(imgs):
+                arr = img.detach().squeeze().cpu().float().numpy()
+                axes[i, j].imshow(arr, cmap="plasma")
+                axes[i, j].axis("off")
+            axes[i, 0].text(0.02, 0.98, f"idx={metadata[i]['idx']} ({metadata[i]['anchor_survey']})",
+                            fontsize=10, ha="left", va="top", color="magenta",
+                            transform=axes[i, 0].transAxes)
+
+        fig.suptitle(f"Training inputs  |  step {step}", fontsize=16, y=0.98)
+        plt.tight_layout(rect=[0, 0, 1, 0.97])
+        fname = os.path.join(self.input_plot_dir, f"train_inputs_step={step:07d}.png")
+        plt.savefig(fname, dpi=100, bbox_inches="tight")
+        plt.close()
+        print(f"Saved training inputs: {fname}")
 
     def validation_step(self, batch, batch_idx):
         if self._fixed_val_batch is None and batch_idx == 0:
@@ -144,7 +185,7 @@ class EuclidCosmosModel(ConditionalFlowMatchingModule):
 # CONFIG — edit before running
 # ---------------------------------------------------------------------------
 H5_PATH     = "/n03data/fontirro/data_files/euclid_cosmos_pairs_vis_f150w_v2.h5"
-CKPT_DIR    = "/n03data/fontirro/euclid-cosmos/checkpoints/euclid-cosmos-vis-f150w/test-5-phase1/v3"  # where to save checkpoints and logs
+CKPT_DIR    = "/n03data/fontirro/euclid-cosmos/checkpoints/euclid-cosmos-vis-f150w/test-5-phase1/v4"  # where to save checkpoints and logs
 
 BATCH_SIZE  = 64
 NUM_WORKERS = 16
@@ -254,6 +295,8 @@ def main():
 
     model = EuclidCosmosModel(
         sample_dir=os.path.join(CKPT_DIR, "samples"),
+        input_plot_dir=os.path.join(CKPT_DIR, "train_inputs"), #added for the training inputs diagnostic plot.
+        input_plot_every_n_steps=1000, #same as above.
         in_channels=1,            # Euclid VIS: 1 channel
         cond_channels=1,          # COSMOS F150W: 1 channel
         image_size=IMAGE_SIZE,
