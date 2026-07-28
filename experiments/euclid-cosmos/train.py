@@ -40,9 +40,8 @@ from galaxy_counter.models.double_train_fm_neighbors import ConditionalFlowMatch
 
 
 class EuclidCosmosModel(ConditionalFlowMatchingModule):
-    """Subclass that disables wandb-specific hooks from the base class.
-    The base class assumes a wandb logger and 3-channel images; we use a CSV
-    logger and 1-channel images, so those hooks are replaced with no-ops.
+    """
+    Flow-matching model for Euclid VIS → COSMOS F150W and vice versa. 
     """
 
     def __init__(self, *args, sample_dir=None, n_val_steps=50, **kwargs):
@@ -162,10 +161,6 @@ N_GPUS      = 1       #set to number of GPUs on the node
 def random_sameins(anchor: torch.Tensor, instrument: torch.Tensor) -> torch.Tensor:
     """For each row, randomly pick a different galaxy of the same instrument.
 
-    anchor mixes instruments row-by-row (bidirectional dataset), so candidates
-    are restricted to rows sharing the same `instrument` label — never the
-    other instrument.
-
     Args:
         anchor: (B, 1, H, W) tensor of galaxy images, mixed instruments.
         instrument: (B,) tensor of per-row instrument labels (e.g. 0/1).
@@ -188,7 +183,8 @@ def random_sameins(anchor: torch.Tensor, instrument: torch.Tensor) -> torch.Tens
 def collate_fn(batch):
     """
     arggs:
-    batch: list of tuples (anchor, cond, metadata) from the dataset. Each anchor and cond have shape (1, H_SIZE, W_SIZE) and metadata is a dict with keys "idx" and "anchor_survey".
+    batch: list of tuples (anchor, cond, metadata) from the dataset. Each anchor and cond have shape (1, H_SIZE, W_SIZE) 
+    and metadata is a dict with keys "idx" and "anchor_survey".
 
     Builds the 5-tuple the model expects:
       (anchor, samegal, sameins, masks, metadata)
@@ -204,8 +200,10 @@ def collate_fn(batch):
     # 0 = euclid anchor, 1 = cosmos anchor — keeps random_sameins from ever crossing into the other instrument.
     instrument = torch.tensor([0 if m["anchor_survey"] == "euclid" else 1 for m in metadata])
 
-    sameins = random_sameins(anchor, instrument).unsqueeze(1)  # (B, k=1, 1, H, W)
-    masks    = torch.ones(B, 1, dtype=torch.bool)
+    sameins = random_sameins(anchor, instrument).unsqueeze(1)  # (B, k=1, 1, H, W).
+    #k=1 is the number of same-instrument "neighbors". In our case, we select one random galaxy for now. So k=1 is always the case.
+    #k=0 would be the case where we don't have any same-instrument neighbors. This is then filled with a masks of ones.
+    masks    = torch.ones(B, 1, dtype=torch.bool) #since k=1 is always the case, this is just a placeholder for the expected model inputs.
     return anchor, cond, sameins, masks, metadata
 
 
@@ -215,7 +213,7 @@ def main():
     torch.backends.cudnn.benchmark = True
     pl.seed_everything(42, workers=True)
 
-    dataset   = EuclidCosmosDataset(H5_PATH, bidirectional=True) #returns ]euclid (anchor), cosmos (input), metadata or cosmos (anchor), euclid (input), metadata depending on the index.
+    dataset   = EuclidCosmosDataset(H5_PATH, bidirectional=True) #returns euclid (anchor), cosmos (input), metadata or cosmos (anchor), euclid (input), metadata depending on the index.
     n_total   = len(dataset)
     n_test    = int(n_total * TEST_RATIO)
     n_val     = int(n_total * VAL_RATIO)
