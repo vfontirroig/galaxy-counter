@@ -78,24 +78,24 @@ class EuclidCosmosModel(ConditionalFlowMatchingModule):
         os.makedirs(self.input_plot_dir, exist_ok=True)
         step = self.trainer.global_step
 
-        col_titles = ["Samegal cond", "Sameins neighbor", "Anchor (target)"]
+        col_titles = ["Anchor (target)", "Samegal cond", "Sameins neighbor"]
         fig, axes = plt.subplots(n, 3, figsize=(7, 2.5 * n))
         if n == 1:
             axes = axes[None, :]
         for j, title in enumerate(col_titles):
             axes[0, j].set_title(title, fontsize=14)
         for i in range(n):
-            imgs = [cond[i], sameins[i, 0], anchor[i]]
+            imgs = [anchor[i], cond[i], sameins[i, 0]]
             for j, img in enumerate(imgs):
                 arr = img.detach().squeeze().cpu().float().numpy()
                 axes[i, j].imshow(arr, cmap="plasma")
                 axes[i, j].axis("off")
             axes[i, 0].text(0.02, 0.98, f"idx={metadata[i]['idx']} ({metadata[i]['anchor_survey']})",
-                            fontsize=10, ha="left", va="top", color="magenta",
+                            fontsize=10, ha="left", va="top", color="white",
                             transform=axes[i, 0].transAxes)
 
         fig.suptitle(f"Training inputs  |  step {step}", fontsize=16, y=0.98)
-        plt.tight_layout(rect=[0, 0, 1, 0.97])
+        plt.tight_layout(rect=[0, 0, 1, 0.98])
         fname = os.path.join(self.input_plot_dir, f"train_inputs_step={step:07d}.png")
         plt.savefig(fname, dpi=100, bbox_inches="tight")
         plt.close()
