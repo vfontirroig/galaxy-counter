@@ -19,12 +19,15 @@ Submit on HPC via:
 
 import os
 import sys
+import math
 import numpy as np
 import torch
+from torch.optim import AdamW
+from torch.optim.lr_scheduler import LambdaLR
 from torch.utils.data import DataLoader, random_split
 import pytorch_lightning as pl
 from pytorch_lightning.loggers import CSVLogger
-from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -45,13 +48,42 @@ class EuclidCosmosModel(ConditionalFlowMatchingModule):
     """
 
     def __init__(self, *args, sample_dir=None, n_val_steps=50,
-                 input_plot_dir=None, input_plot_every_n_steps=500, **kwargs):
+                 input_plot_dir=None, input_plot_every_n_steps=500,
+                 warmup_steps=1000, **kwargs):
         super().__init__(*args, **kwargs)
         self.sample_dir = sample_dir
         self.n_val_steps = n_val_steps
         self.input_plot_dir = input_plot_dir
         self.input_plot_every_n_steps = input_plot_every_n_steps
+        self.warmup_steps = warmup_steps
         self._fixed_val_batch = None
+
+    def configure_optimizers(self):
+        """Linear warmup + cosine decay over the run's actual step budget.
+        Overrides the base class's epoch-keyed CosineAnnealingLR, which is
+        broken here: this run is driven by max_steps with max_epochs unset,
+        so trainer.max_epochs resolves to -1, making T_max negative and the
+        cosine schedule oscillate every epoch instead of decaying once."""
+        optimizer = AdamW(self.parameters(), lr=self.lr)
+        total_steps = self.trainer.max_steps
+        warmup_steps = self.warmup_steps
+
+        def lr_lambda(step):
+            if step < warmup_steps:
+                return step / max(1, warmup_steps)
+            progress = (step - warmup_steps) / max(1, total_steps - warmup_steps)
+            progress = min(max(progress, 0.0), 1.0)
+            return 0.5 * (1 + math.cos(math.pi * progress))
+
+        scheduler = LambdaLR(optimizer, lr_lambda)
+        return {
+            "optimizer": optimizer,
+            "lr_scheduler": {
+                "scheduler": scheduler,
+                "interval": "step",
+                "frequency": 1,
+            },
+        }
 
     def on_train_start(self) -> None:
         import time
@@ -185,13 +217,13 @@ class EuclidCosmosModel(ConditionalFlowMatchingModule):
 # CONFIG — edit before running
 # ---------------------------------------------------------------------------
 H5_PATH     = "/n03data/fontirro/data_files/euclid_cosmos_pairs_vis_f150w_v2.h5"
-CKPT_DIR    = "/n03data/fontirro/euclid-cosmos/checkpoints/euclid-cosmos-vis-f150w/test-5-phase1/v4"  # where to save checkpoints and logs
+CKPT_DIR    = "/n03data/fontirro/euclid-cosmos/checkpoints/euclid-cosmos-vis-f150w/test-5-phase1/v5"  # where to save checkpoints and logs
 
 BATCH_SIZE  = 64
 NUM_WORKERS = 16
 VAL_RATIO   = 0.1
 TEST_RATIO  = 0.05
-NUM_STEPS   = 70_000
+NUM_STEPS   = 200_000
 IMAGE_SIZE  = 64      #Cutout spatial size
 LR          = 1e-4    #learning rate for AdamW optimizer
 
@@ -331,6 +363,12 @@ def main():
         save_top_k=1,
         filename="latest-step={step}",
     )
+    early_stopping = EarlyStopping(
+        monitor="val/loss",
+        mode="min",
+        patience=20,  # in validation checks, i.e. 20 * val_check_interval = 20_000 steps
+        verbose=True,
+    )
 
     trainer = pl.Trainer(
         max_steps=max(1, int(NUM_STEPS / N_GPUS)),
@@ -342,7 +380,7 @@ def main():
         precision="bf16-mixed",
         val_check_interval=1000,
         check_val_every_n_epoch=None,
-        callbacks=[best_checkpoint, periodic_checkpoint],
+        callbacks=[best_checkpoint, periodic_checkpoint, early_stopping],
         num_sanity_val_steps=2,
     )
 
