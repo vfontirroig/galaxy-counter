@@ -131,7 +131,7 @@ def main():
                 f"nearest same-survey neighbor is index {j} (pixel distance {distance[i]:.4f}), "
                 + (f"ra={ra[j]:.6f} dec={dec[j]:.6f}" if j != -1 else "no neighbor found")
             )
-
+        print("end.")
 
 if __name__ == "__main__":
     main()
