@@ -35,6 +35,9 @@ SURVEY_IMAGE_KEYS = {
 
 MAX_NEIGHBOR_PIXEL_DIST = None  # optional cap on pixel-space distance; farther matches become -1
 
+RA_COL = "ra"    # column name for right ascension (degrees) in catalog/features, for the example below
+DEC_COL = "dec"  # column name for declination (degrees) in catalog/features
+
 # ---------------------------------------------------------------------------
 
 import numpy as np
@@ -112,15 +115,22 @@ def add_neighbors_to_h5(h5_path, survey_image_keys, max_distance=None, metric="e
             f.create_dataset(dist_key, data=distance)
 
 def main():
-    #add_neighbors_to_h5(H5_PATH, SURVEY_IMAGE_KEYS, max_distance=MAX_NEIGHBOR_PIXEL_DIST)
-
-    # Example: look up the neighbor found for one object, per survey.
+    # Example: compute the neighbor for one object, per survey, without
+    # writing anything back to the HDF5 file (read-only).
     with h5py.File(H5_PATH, "r") as f:
+        ra = f[f"catalog/features/{RA_COL}"][:]
+        dec = f[f"catalog/features/{DEC_COL}"][:]
+
         i = 0
-        for suffix in SURVEY_IMAGE_KEYS.values():
-            neighbor_idx = f[f"neighbor_idx_{suffix}"][i, 0]
-            neighbor_dist = f[f"neighbor_dist_{suffix}"][i]
-            print(f"Object {i} ({suffix}): nearest same-survey neighbor is index {neighbor_idx} (pixel distance {neighbor_dist:.4f})")
+        for image_key, suffix in SURVEY_IMAGE_KEYS.items():
+            images = f[image_key][:]
+            neighbor_idx, distance = nearest_neighbor_pixel(images, max_distance=MAX_NEIGHBOR_PIXEL_DIST)
+            j = neighbor_idx[i]
+            print(
+                f"Object {i} ({suffix}): anchor ra={ra[i]:.6f} dec={dec[i]:.6f}; "
+                f"nearest same-survey neighbor is index {j} (pixel distance {distance[i]:.4f}), "
+                + (f"ra={ra[j]:.6f} dec={dec[j]:.6f}" if j != -1 else "no neighbor found")
+            )
 
 
 if __name__ == "__main__":
