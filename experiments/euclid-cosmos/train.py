@@ -2,10 +2,11 @@
 
 Train the flow-matching model on paired Euclid (VIS) x COSMOS (F150W) cutouts.
 
-Phase 1 (this script): simple pairs, no precomputed same-instrument neighbors.
   - encoder_1 conditions on the COSMOS counterpart of the same galaxy.
-  - encoder_2 receives a random galaxy from the same instrument as the anchor,
-    as a stand-in for real precomputed neighbors (see random_sameins below).
+  - encoder_2 receives the precomputed same-instrument neighbor of the anchor
+    (pixel-level 1-NN, written into H5_PATH by experiments/euclid-cosmos/neighbors.py —
+    run that script first). Rows with no neighbor found (neighbor_idx == -1)
+    fall back to random_sameins so sameins is always populated.
   - lambda_geometric=0 matches the project default (see neighbours_train.py),
     independent of encoder_2/sameins: the geometric loss only compares
     encoder_1(target) against encoder_1(samegal counterpart).
@@ -20,6 +21,7 @@ Submit on HPC via:
 import os
 import sys
 import math
+from functools import partial
 import numpy as np
 import torch
 from torch.optim import AdamW
@@ -253,30 +255,59 @@ def random_sameins(anchor: torch.Tensor, instrument: torch.Tensor) -> torch.Tens
         out[group_idx] = anchor[group_idx[local]]
     return out  # (B, 1, H, W)
 
-def collate_fn(batch):
+def collate_fn(batch, dataset):
     """
-    arggs:
-    batch: list of tuples (anchor, cond, metadata) from the dataset. Each anchor and cond have shape (1, H_SIZE, W_SIZE) 
-    and metadata is a dict with keys "idx" and "anchor_survey".
+    Args:
+        batch: list of tuples (anchor, cond, metadata) from the dataset. Each anchor and cond have
+            shape (1, H_SIZE, W_SIZE) and metadata is a dict with keys "idx" and "anchor_survey".
+        dataset: the EuclidCosmosDataset instance, used to fetch the precomputed same-instrument
+            neighbor image (neighbor_idx_euclid / neighbor_idx_cosmos, written by
+            experiments/euclid-cosmos/neighbors.py) directly from its already-open HDF5 handle.
 
     Builds the 5-tuple the model expects:
       (anchor, samegal, sameins, masks, metadata)
+
+    sameins is the precomputed same-instrument neighbor (pixel-level 1-NN).
+    Rows with no precomputed neighbor (neighbor_idx == -1, e.g. beyond
+    MAX_NEIGHBOR_PIXEL_DIST) fall back to random_sameins so sameins is always
+    populated and masks stays all-True, same as before.
 
     Direction (which survey is anchor vs condition) is determined by the
     dataset: even indices → Euclid anchor, odd indices → COSMOS anchor.
     """
     anchor = torch.stack([b[0] for b in batch])   # (B, 1, H, W)
     cond   = torch.stack([b[1] for b in batch])   # (B, 1, H, W) samegal counterpart (i.e the input)
-    B = anchor.shape[0]
     metadata = [b[2] for b in batch]
+    B = anchor.shape[0]
 
-    # 0 = euclid anchor, 1 = cosmos anchor — keeps random_sameins from ever crossing into the other instrument.
-    instrument = torch.tensor([0 if m["anchor_survey"] == "euclid" else 1 for m in metadata])
+    dataset._open_file()
+    f = dataset.file
 
-    sameins = random_sameins(anchor, instrument).unsqueeze(1)  # (B, k=1, 1, H, W).
-    #k=1 is the number of same-instrument "neighbors". In our case, we select one random galaxy for now. So k=1 is always the case.
-    #k=0 would be the case where we don't have any same-instrument neighbors. This is then filled with a masks of ones.
-    masks    = torch.ones(B, 1, dtype=torch.bool) #since k=1 is always the case, this is just a placeholder for the expected model inputs.
+    sameins = anchor.clone().unsqueeze(1)  # (B, k=1, 1, H, W); overwritten below when a precomputed neighbor exists
+    missing = []
+    for i, meta in enumerate(metadata):
+        idx, survey = meta["idx"], meta["anchor_survey"]
+        if survey == "euclid":
+            neighbor_key, img_key, norm_key = "neighbor_idx_euclid", "euclid_images_upscaled", "euclid_up"
+        else:
+            neighbor_key, img_key, norm_key = "neighbor_idx_cosmos", "cosmos_images_downscaled", "cosmos_ds"
+
+        j = int(f[neighbor_key][idx, 0])
+        if j == -1:
+            missing.append(i)
+            continue
+
+        raw = torch.from_numpy(f[img_key][j].copy())
+        mean, std = dataset.norm_dict[norm_key]
+        sameins[i, 0] = (raw - mean) / std
+
+    if missing:
+        instrument = torch.tensor([0 if m["anchor_survey"] == "euclid" else 1 for m in metadata])
+        fallback = random_sameins(anchor, instrument)
+        for i in missing:
+            sameins[i, 0] = fallback[i]
+
+    masks = torch.ones(B, 1, dtype=torch.bool)  # sameins is always populated (precomputed or fallback)
     return anchor, cond, sameins, masks, metadata
 
 
@@ -308,7 +339,7 @@ def main():
         batch_size=BATCH_SIZE,
         shuffle=True,
         num_workers=NUM_WORKERS,
-        collate_fn=collate_fn,
+        collate_fn=partial(collate_fn, dataset=dataset),
         persistent_workers=NUM_WORKERS > 0,
         pin_memory=True,
         prefetch_factor=4 if NUM_WORKERS > 0 else None,
@@ -319,7 +350,7 @@ def main():
         batch_size=BATCH_SIZE,
         shuffle=False,
         num_workers=NUM_WORKERS,
-        collate_fn=collate_fn,
+        collate_fn=partial(collate_fn, dataset=dataset),
         persistent_workers=NUM_WORKERS > 0,
         pin_memory=True,
         prefetch_factor=4 if NUM_WORKERS > 0 else None,
