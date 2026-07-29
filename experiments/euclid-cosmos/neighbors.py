@@ -133,5 +133,8 @@ def main():
             )
         print("end.")
 
+    #Adding the neighbors to the HDF5 file
+    add_neighbors_to_h5(H5_PATH, SURVEY_IMAGE_KEYS, max_distance=MAX_NEIGHBOR_PIXEL_DIST, metric="euclidean")
+
 if __name__ == "__main__":
     main()
