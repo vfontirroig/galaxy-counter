@@ -153,57 +153,69 @@ class EuclidCosmosModel(ConditionalFlowMatchingModule):
         if self._fixed_val_batch is None or self.sample_dir is None:
             return
 
-        anchor, cond, _, masks, galaxy_ids, surveys = (
+        anchor, cond, sameins, masks, galaxy_ids, surveys = (
             *[t.to(self.device) for t in self._fixed_val_batch[:4]],
             self._fixed_val_batch[4],
             self._fixed_val_batch[5],
         )
         os.makedirs(self.sample_dir, exist_ok=True)
         step = self.trainer.global_step
+        num_samples = 3  # independent stochastic generations per row, same conditioning
 
         # one plot per direction, containing only rows that match that direction
         direction_cfg = {
-            "euclid": ("COSMOS to Euclid", "COSMOS input", "Generated Euclid", "Real Euclid", "Residual (Gen - Real)"),
-            "cosmos": ("Euclid to COSMOS", "Euclid input", "Generated COSMOS", "Real COSMOS", "Residual (Gen - Real)"),
+            "euclid": ("COSMOS to Euclid", "COSMOS input", "Real Euclid"),
+            "cosmos": ("Euclid to COSMOS", "Euclid input", "Real COSMOS"),
         }
 
-        for survey, (dir_label, t0, t1, t2, t3) in direction_cfg.items():
+        for survey, (dir_label, samegal_label, real_label) in direction_cfg.items():
             idx = [i for i, s in enumerate(surveys) if s == survey][:8]
             if not idx:
                 continue
 
             anc = anchor[idx]
             con = cond[idx]
+            sam = sameins[idx]
             msk = masks[idx]
             ids = [galaxy_ids[i] for i in idx]
             n = len(idx)
 
-            sameins_vis = con.unsqueeze(1)
             with torch.no_grad():
-                generated = self.sample(
-                    cond_image_samegal=con,
-                    cond_image_sameins=sameins_vis,
-                    masks=msk,
-                    num_steps=self.n_val_steps,
-                )
+                generations = [
+                    self.sample(
+                        cond_image_samegal=con,
+                        cond_image_sameins=sam,
+                        masks=msk,
+                        num_steps=self.n_val_steps,
+                    )
+                    for _ in range(num_samples)
+                ]
 
-            fig, axes = plt.subplots(n, 4, figsize=(9, 2.5 * n))
+            col_titles = (
+                [samegal_label, "Same-instrument input", real_label]
+                + [f"Generated #{k + 1}" for k in range(num_samples)]
+                + ["Residual (Gen #1 - Real)"]
+            )
+            n_cols = len(col_titles)
+
+            fig, axes = plt.subplots(n, n_cols, figsize=(2.25 * n_cols, 2.5 * n))
             if n == 1:
                 axes = axes[None, :]
-            for j, title in enumerate([t0, t1, t2, t3]):
-                axes[0, j].set_title(title, fontsize=14)
+            for j, title in enumerate(col_titles):
+                axes[0, j].set_title(title, fontsize=12)
             for i in range(n):
-                for j, img in enumerate([con[i], generated[i], anc[i]]):
+                imgs = [con[i], sam[i, 0], anc[i]] + [gen[i] for gen in generations]
+                for j, img in enumerate(imgs):
                     arr = img.squeeze().cpu().float().numpy()
                     axes[i, j].imshow(arr, cmap="plasma")
                     axes[i, j].axis("off")
 
-                residual = (generated[i] - anc[i]).squeeze().cpu().float().numpy()
+                residual = (generations[0][i] - anc[i]).squeeze().cpu().float().numpy()
                 vmax = np.abs(residual).max()
-                axes[i, 3].imshow(residual, cmap="coolwarm", vmin=-vmax, vmax=vmax)
-                axes[i, 3].axis("off")
+                axes[i, n_cols - 1].imshow(residual, cmap="coolwarm", vmin=-vmax, vmax=vmax)
+                axes[i, n_cols - 1].axis("off")
 
-                axes[i, 0].text(0.02, 0.98, f"idx={ids[i]}", fontsize=20,
+                axes[i, 0].text(0.02, 0.98, f"idx={ids[i]}", fontsize=16,
                                 ha="left", va="top", color="magenta",
                                 transform=axes[i, 0].transAxes)
 
@@ -218,8 +230,8 @@ class EuclidCosmosModel(ConditionalFlowMatchingModule):
 # ---------------------------------------------------------------------------
 # CONFIG — edit before running
 # ---------------------------------------------------------------------------
-H5_PATH     = "/n03data/fontirro/data_files/euclid_cosmos_pairs_vis_f150w_v2.h5"
-CKPT_DIR    = "/n03data/fontirro/euclid-cosmos/checkpoints/euclid-cosmos-vis-f150w/test-5-phase1/v5"  # where to save checkpoints and logs
+H5_PATH     = "/n03data/fontirro/data_files/euclid_cosmos_pairs_vis_f150w_v3.h5"
+CKPT_DIR    = "/n03data/fontirro/euclid-cosmos/checkpoints/euclid-cosmos-vis-f150w/test-6-phase1/v1"  # where to save checkpoints and logs
 
 BATCH_SIZE  = 64
 NUM_WORKERS = 16

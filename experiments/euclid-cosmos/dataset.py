@@ -135,7 +135,7 @@ def compute_norm_stats(hdf5_path: str, n_samples: int = 10_000) -> dict:
 def main():
     from torch.utils.data import DataLoader
 
-    H5_PATH = "/n03data/fontirro/data_files/euclid_cosmos_pairs_vis_f150w_v2.h5"
+    H5_PATH = "/n03data/fontirro/data_files/euclid_cosmos_pairs_vis_f150w_v3.h5"
 
     print("Computing normalization stats...")
     stats = compute_norm_stats(H5_PATH)
