@@ -49,7 +49,7 @@ NUM_WORKERS = 16  # parallel threads for loading + preprocessing
 H_SIZE = 64  # target spatial size for both Euclid and COSMOS
 W_SIZE = 64  # target spatial size for both Euclid and COSMOS
 
-EUCLID_CROP_SIZE = 36   # center-crop size applied to Euclid VIS cutouts
+EUCLID_CROP_SIZE = 40   # center-crop size applied to Euclid VIS cutouts
 COSMOS_CROP_SIZE = 120  # center-crop size applied to COSMOS F150W cutouts (rotated —
                          # too large a crop can dip into the NaN padding outside the
                          # rotated footprint; see cosmos_nan_frac below)
