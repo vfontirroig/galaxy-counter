@@ -65,16 +65,16 @@ def nearest_neighbor_pixel(images, max_distance=None, metric="euclidean"):
     """
     images = np.asarray(images) #every 
     n = images.shape[0]
-    if n < 2:
+    if n < 2: #safeguard: to get neighbors we need at least 2 images.
         return np.full(n, -1, dtype=np.int64), np.full(n, np.inf)
 
-    flat = images.reshape(n, -1).astype(np.float32)
+    flat = images.reshape(n, -1).astype(np.float32) #reshapes the images to a 2D array where each image is flattened into a single row.
 
     # n_neighbors=2: the closest match to itself is always itself at
     # distance 0 (index 0 after sorting), so we take the second column.
-    nn = NearestNeighbors(n_neighbors=2, metric=metric)
-    nn.fit(flat)
-    dist, idx = nn.kneighbors(flat)
+    nn = NearestNeighbors(n_neighbors=2, metric=metric) #call the knn
+    nn.fit(flat) #fit it given the flattened images.
+    dist, idx = nn.kneighbors(flat) #returns the distances and indices of the nearest neighbors for each image.
 
     neighbor_idx = idx[:, 1].astype(np.int64)
     distance = dist[:, 1].astype(np.float64)
