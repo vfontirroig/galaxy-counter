@@ -146,6 +146,7 @@ class EuclidCosmosModel(ConditionalFlowMatchingModule):
                 masks[:n].detach().clone(),
                 [m["idx"] for m in metadata[:n]],
                 [m["anchor_survey"] for m in metadata[:n]],
+                [m["sameins_idx"] for m in metadata[:n]],
             )
         return super().validation_step(batch, batch_idx)
 
@@ -153,10 +154,11 @@ class EuclidCosmosModel(ConditionalFlowMatchingModule):
         if self._fixed_val_batch is None or self.sample_dir is None:
             return
 
-        anchor, cond, sameins, masks, galaxy_ids, surveys = (
+        anchor, cond, sameins, masks, galaxy_ids, surveys, sameins_ids = (
             *[t.to(self.device) for t in self._fixed_val_batch[:4]],
             self._fixed_val_batch[4],
             self._fixed_val_batch[5],
+            self._fixed_val_batch[6],
         )
         os.makedirs(self.sample_dir, exist_ok=True)
         step = self.trainer.global_step
@@ -178,6 +180,7 @@ class EuclidCosmosModel(ConditionalFlowMatchingModule):
             sam = sameins[idx]
             msk = masks[idx]
             ids = [galaxy_ids[i] for i in idx]
+            sam_ids = [sameins_ids[i] for i in idx]
             n = len(idx)
 
             with torch.no_grad():
@@ -218,6 +221,11 @@ class EuclidCosmosModel(ConditionalFlowMatchingModule):
                 axes[i, 0].text(0.02, 0.98, f"idx={ids[i]}", fontsize=16,
                                 ha="left", va="top", color="magenta",
                                 transform=axes[i, 0].transAxes)
+
+                sam_label = f"idx={sam_ids[i]}" if sam_ids[i] != -1 else "idx=? (random)"
+                axes[i, 1].text(0.02, 0.98, sam_label, fontsize=16,
+                                ha="left", va="top", color="magenta",
+                                transform=axes[i, 1].transAxes)
 
             tag = dir_label.replace(" ", "").replace("to", "-")
             fig.suptitle(f"{dir_label}  |  step {step}", fontsize=18, y=0.98)
@@ -305,6 +313,7 @@ def collate_fn(batch, dataset):
             neighbor_key, img_key, norm_key = "neighbor_idx_cosmos", "cosmos_images_downscaled", "cosmos_ds"
 
         j = int(f[neighbor_key][idx, 0])
+        meta["sameins_idx"] = j  # -1 until random_sameins fills it in below, if this row is missing
         if j == -1:
             missing.append(i)
             continue
@@ -314,6 +323,8 @@ def collate_fn(batch, dataset):
         sameins[i, 0] = (raw - mean) / std
 
     if missing:
+        # random_sameins doesn't report which row it picked, so these stay
+        # sameins_idx == -1 (shown as "random" rather than a real row index).
         instrument = torch.tensor([0 if m["anchor_survey"] == "euclid" else 1 for m in metadata])
         fallback = random_sameins(anchor, instrument)
         for i in missing:
