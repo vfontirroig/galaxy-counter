@@ -127,6 +127,11 @@ class EuclidCosmosModel(ConditionalFlowMatchingModule):
             axes[i, 0].text(0.02, 0.98, f"idx={metadata[i]['idx']} ({metadata[i]['anchor_survey']})",
                             fontsize=10, ha="left", va="top", color="white",
                             transform=axes[i, 0].transAxes)
+            sameins_idx = metadata[i]["sameins_idx"]
+            sam_label = f"idx={sameins_idx}" if sameins_idx != -1 else "idx=? (random)"
+            axes[i, 2].text(0.02, 0.98, sam_label,
+                            fontsize=10, ha="left", va="top", color="white",
+                            transform=axes[i, 2].transAxes)
 
         fig.suptitle(f"Training inputs  |  step {step}", fontsize=16, y=0.98)
         plt.tight_layout(rect=[0, 0, 1, 0.98])
