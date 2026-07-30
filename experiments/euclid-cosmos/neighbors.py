@@ -1,19 +1,30 @@
 """
 Add same-survey 1 nearest neighbor indices to an existing paired HDF5 file
-(built by build_hdf5.py), based on pixel-level image similarity. This is the
-"same-instrument neighbor" signal described in new_dataset_guide.md step 3
-(f['neighbor_idx_a'] / f['neighbor_idx_b']): flatten each image and run
-sklearn NearestNeighbors to find, for every image, the closest *other* image
-in the same survey's array.
+(built by build_hdf5.py). This is the "same-instrument neighbor" signal
+described in new_dataset_guide.md step 3 (f['neighbor_idx_a'] / f['neighbor_idx_b']).
+
+Two independent methods are computed side by side, for comparison:
+  - pixel-level (nearest_neighbor_pixel / add_neighbors_to_h5): flatten each
+    image and run sklearn NearestNeighbors — measures visual similarity, not
+    position. Two galaxies can look alike from opposite sides of the field
+    (different PSF), or look nothing alike while genuinely sitting next to
+    each other on the sky.
+  - sky-coordinate (nearest_neighbor_sky / add_sky_neighbors_to_h5): match on
+    RA/Dec via astropy SkyCoord — this is what actually captures "shared
+    observing conditions" (PSF, sky background), independent of image content.
 
 Run after build_hdf5.py has produced the paired file:
     python experiments/euclid-cosmos/neighbors.py
 
 Writes, at the top level of the HDF5 file:
-    neighbor_idx_euclid   — (N, 1) int64, index into euclid_images, -1 = none
-    neighbor_dist_euclid  — (N,) float64, pixel-space distance to that neighbor
-    neighbor_idx_cosmos   — (N, 1) int64, index into cosmos_images
-    neighbor_dist_cosmos  — (N,) float64
+    neighbor_idx_euclid       — (N, 1) int64, pixel-level, index into euclid_images, -1 = none
+    neighbor_dist_euclid      — (N,) float64, pixel-space distance to that neighbor
+    neighbor_idx_cosmos       — (N, 1) int64, pixel-level, index into cosmos_images
+    neighbor_dist_cosmos      — (N,) float64
+    neighbor_idx_sky_euclid   — (N, 1) int64, sky-coordinate, index into euclid_images, -1 = none
+    neighbor_sep_arcsec_sky_euclid — (N,) float64, angular separation to that neighbor
+    neighbor_idx_sky_cosmos   — (N, 1) int64, sky-coordinate, index into cosmos_images
+    neighbor_sep_arcsec_sky_cosmos — (N,) float64
 
 At training time, which array to index into (neighbor_idx_euclid vs.
 neighbor_idx_cosmos) depends on which survey the current anchor is drawn
@@ -35,14 +46,20 @@ SURVEY_IMAGE_KEYS = {
 
 MAX_NEIGHBOR_PIXEL_DIST = None  # optional cap on pixel-space distance; farther matches become -1
 
-RA_COL = "ra"    # column name for right ascension (degrees) in catalog/features, for the example below
+RA_COL = "ra"    # column name for right ascension (degrees) in catalog/features
 DEC_COL = "dec"  # column name for declination (degrees) in catalog/features
+
+MAX_NEIGHBOR_SEP_ARCSEC = None  # optional cap on sky separation for nearest_neighbor_sky; farther matches become -1
+
+SKY_SEPARATION_THRESHOLD_ARCSEC = 5.0  # used only for the sky-closeness sanity check below
 
 # ---------------------------------------------------------------------------
 
 import numpy as np
 import h5py
 from sklearn.neighbors import NearestNeighbors
+from astropy.coordinates import SkyCoord
+import astropy.units as u
 
 
 def nearest_neighbor_pixel(images, max_distance=None, metric="euclidean"):
@@ -114,27 +131,165 @@ def add_neighbors_to_h5(h5_path, survey_image_keys, max_distance=None, metric="e
             f.create_dataset(idx_key, data=neighbor_idx[:, None])
             f.create_dataset(dist_key, data=distance)
 
+
+def nearest_neighbor_sky(ra, dec, max_sep_arcsec=None):
+    """
+    For each galaxy at (ra[i], dec[i]), find the index of its closest *other*
+    galaxy in the same array by true angular (sky) separation — captures
+    "shared observing conditions" (PSF, sky background) directly, unlike
+    nearest_neighbor_pixel which only measures visual similarity.
+
+    Args:
+    - ra, dec : array-like, degrees.
+    - max_sep_arcsec : float or None.
+        Matches farther than this are discarded (-1 index, inf separation).
+
+    Returns:
+    - neighbor_idx : (N,) int64 array. Index into ra/dec of the nearest other
+        galaxy, or -1 if none found within max_sep_arcsec.
+    - separation_arcsec : (N,) float64 array. Angular separation to that
+        neighbor (np.inf where neighbor_idx == -1).
+    """
+    ra = np.asarray(ra, dtype=np.float64)
+    dec = np.asarray(dec, dtype=np.float64)
+    n = len(ra)
+    if n < 2:  # same safeguard as nearest_neighbor_pixel: need >=2 points to have an "other" one
+        return np.full(n, -1, dtype=np.int64), np.full(n, np.inf)
+
+    coords = SkyCoord(ra=ra * u.deg, dec=dec * u.deg)
+    # nthneighbor=2: nthneighbor=1 would just match each point to itself at separation 0.
+    idx, sep2d, _ = coords.match_to_catalog_sky(coords, nthneighbor=2)
+
+    neighbor_idx = idx.astype(np.int64)
+    separation_arcsec = sep2d.arcsec.astype(np.float64)
+
+    if max_sep_arcsec is not None:
+        too_far = separation_arcsec > max_sep_arcsec
+        neighbor_idx[too_far] = -1
+        separation_arcsec[too_far] = np.inf
+
+    return neighbor_idx, separation_arcsec
+
+
+def add_sky_neighbors_to_h5(h5_path, survey_image_keys, ra_col=RA_COL, dec_col=DEC_COL, max_sep_arcsec=None):
+    """
+    Open an existing HDF5 file and add same-survey 1-NN sky-coordinate
+    neighbor indices, for direct comparison against add_neighbors_to_h5
+    (pixel-level). RA/Dec are shared across surveys here (each row is
+    already a cross-matched pair at one sky position), so every suffix in
+    survey_image_keys gets the same neighbor_idx/separation — kept per-suffix
+    only so downstream code can look these up the same way as the pixel ones.
+
+    Args:
+    - h5_path : path to the HDF5 file (opened in append mode).
+    - survey_image_keys : dict mapping image dataset name to output suffix,
+        same as add_neighbors_to_h5; writes f["neighbor_idx_sky_<suffix>"]
+        and f["neighbor_sep_arcsec_sky_<suffix>"].
+    - ra_col, dec_col : column names in catalog/features (degrees).
+    - max_sep_arcsec : passed to nearest_neighbor_sky.
+    """
+    with h5py.File(h5_path, "a") as f:
+        ra = f[f"catalog/features/{ra_col}"][:]
+        dec = f[f"catalog/features/{dec_col}"][:]
+        neighbor_idx, separation_arcsec = nearest_neighbor_sky(ra, dec, max_sep_arcsec=max_sep_arcsec)
+        n_with_neighbor = int((neighbor_idx != -1).sum())
+        print(f"Computing sky-coordinate kNN... {n_with_neighbor}/{len(neighbor_idx)} galaxies have a same-survey neighbor")
+
+        for suffix in survey_image_keys.values():
+            idx_key, sep_key = f"neighbor_idx_sky_{suffix}", f"neighbor_sep_arcsec_sky_{suffix}"
+            for key in (idx_key, sep_key):
+                if key in f:
+                    del f[key]
+            f.create_dataset(idx_key, data=neighbor_idx[:, None])
+            f.create_dataset(sep_key, data=separation_arcsec)
+
+
+def check_pixel_neighbors_are_sky_close(h5_path, survey_image_keys, ra_col=RA_COL, dec_col=DEC_COL,
+                                         sky_threshold_arcsec=SKY_SEPARATION_THRESHOLD_ARCSEC):
+    """
+    Sanity check on the neighbor_idx_<suffix> datasets already written by
+    add_neighbors_to_h5: measure the true angular (sky) separation between
+    each anchor and its pixel-matched neighbor, since pixel similarity alone
+    doesn't guarantee they're actually close on the sky (and therefore don't
+    actually share observing conditions). A low fraction beyond
+    sky_threshold_arcsec means pixel similarity is a good proxy for "nearby
+    on the sky"; a high fraction means it isn't, and a sky-coordinate-based
+    match (RA/Dec) would be more appropriate for this signal.
+
+    Args:
+    - h5_path : path to the HDF5 file (must already have neighbor_idx_<suffix>
+        datasets, i.e. add_neighbors_to_h5 has been run).
+    - survey_image_keys : dict mapping image dataset name to neighbor suffix,
+        same as passed to add_neighbors_to_h5 (only the suffixes are used here).
+    - ra_col, dec_col : column names in catalog/features (degrees).
+    - sky_threshold_arcsec : separation above which a pixel-match is flagged
+        as not actually sky-close.
+
+    Returns:
+    - dict {suffix: separation_arcsec array of shape (N,)}, NaN where the row
+        had no pixel-matched neighbor (neighbor_idx == -1).
+    """
+    results = {}
+    with h5py.File(h5_path, "r") as f:
+        ra = f[f"catalog/features/{ra_col}"][:]
+        dec = f[f"catalog/features/{dec_col}"][:]
+        coords = SkyCoord(ra=ra * u.deg, dec=dec * u.deg)
+
+        for suffix in survey_image_keys.values():
+            neighbor_idx = f[f"neighbor_idx_{suffix}"][:, 0]
+            has_neighbor = neighbor_idx != -1
+
+            separation_arcsec = np.full(len(neighbor_idx), np.nan)
+            separation_arcsec[has_neighbor] = coords[has_neighbor].separation(
+                coords[neighbor_idx[has_neighbor]]
+            ).arcsec
+
+            valid = separation_arcsec[has_neighbor]
+            far_frac = float((valid > sky_threshold_arcsec).mean()) if len(valid) else float("nan")
+            print(
+                f"{suffix}: {len(valid)}/{len(neighbor_idx)} pixel-matched pairs; "
+                f"median separation {np.median(valid):.2f}\", "
+                f"{far_frac * 100:.1f}% farther than {sky_threshold_arcsec}\""
+            )
+            results[suffix] = separation_arcsec
+
+    return results
+
+
 def main():
     # Example: compute the neighbor for one object, per survey, without
     # writing anything back to the HDF5 file (read-only).
-    with h5py.File(H5_PATH, "r") as f:
-        ra = f[f"catalog/features/{RA_COL}"][:]
-        dec = f[f"catalog/features/{DEC_COL}"][:]
+    # with h5py.File(H5_PATH, "r") as f:
+    #     ra = f[f"catalog/features/{RA_COL}"][:]
+    #     dec = f[f"catalog/features/{DEC_COL}"][:]
 
-        i = 0
-        for image_key, suffix in SURVEY_IMAGE_KEYS.items():
-            images = f[image_key][:]
-            neighbor_idx, distance = nearest_neighbor_pixel(images, max_distance=MAX_NEIGHBOR_PIXEL_DIST)
-            j = neighbor_idx[i]
-            print(
-                f"Object {i} ({suffix}): anchor ra={ra[i]:.6f} dec={dec[i]:.6f}; "
-                f"nearest same-survey neighbor is index {j} (pixel distance {distance[i]:.4f}), "
-                + (f"ra={ra[j]:.6f} dec={dec[j]:.6f}" if j != -1 else "no neighbor found")
-            )
-        print("end.")
+    #     i = 0
+    #     for image_key, suffix in SURVEY_IMAGE_KEYS.items():
+    #         images = f[image_key][:]
+    #         neighbor_idx, distance = nearest_neighbor_pixel(images, max_distance=MAX_NEIGHBOR_PIXEL_DIST)
+    #         j = neighbor_idx[i]
+    #         print(
+    #             f"Object {i} ({suffix}): anchor ra={ra[i]:.6f} dec={dec[i]:.6f}; "
+    #             f"nearest same-survey neighbor is index {j} (pixel distance {distance[i]:.4f}), "
+    #             + (f"ra={ra[j]:.6f} dec={dec[j]:.6f}" if j != -1 else "no neighbor found")
+    #         )
+    #     print("end.")
 
-    #Adding the neighbors to the HDF5 file
-    add_neighbors_to_h5(H5_PATH, SURVEY_IMAGE_KEYS, max_distance=MAX_NEIGHBOR_PIXEL_DIST, metric="euclidean")
+    #Adding the neighbors to the HDF5 file, both methods side by side
+    #add_neighbors_to_h5(H5_PATH, SURVEY_IMAGE_KEYS, max_distance=MAX_NEIGHBOR_PIXEL_DIST, metric="euclidean")
+    add_sky_neighbors_to_h5(H5_PATH, SURVEY_IMAGE_KEYS, RA_COL, DEC_COL, max_sep_arcsec=MAX_NEIGHBOR_SEP_ARCSEC)
+
+    # Sanity check: are pixel-matched neighbors actually close on the sky?
+    #check_pixel_neighbors_are_sky_close(H5_PATH, SURVEY_IMAGE_KEYS, RA_COL, DEC_COL, SKY_SEPARATION_THRESHOLD_ARCSEC)
+
+    # Do the two methods agree on which galaxy is the neighbor?
+    # with h5py.File(H5_PATH, "r") as f:
+    #     for suffix in SURVEY_IMAGE_KEYS.values():
+    #         pixel_idx = f[f"neighbor_idx_{suffix}"][:, 0]
+    #         sky_idx = f[f"neighbor_idx_sky_{suffix}"][:, 0]
+    #         both_found = (pixel_idx != -1) & (sky_idx != -1)
+    #         agree_frac = float((pixel_idx[both_found] == sky_idx[both_found]).mean()) if both_found.any() else float("nan")
+    #         print(f"{suffix}: pixel and sky methods pick the same neighbor for {agree_frac * 100:.1f}% of rows")
 
 if __name__ == "__main__":
     main()
