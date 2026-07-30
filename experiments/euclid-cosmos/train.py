@@ -4,7 +4,8 @@ Train the flow-matching model on paired Euclid (VIS) x COSMOS (F150W) cutouts.
 
   - encoder_1 conditions on the COSMOS counterpart of the same galaxy.
   - encoder_2 receives the precomputed same-instrument neighbor of the anchor
-    (pixel-level 1-NN, written into H5_PATH by experiments/euclid-cosmos/neighbors.py —
+    (sky-coordinate 1-NN: closest other galaxy in the same survey by angular
+    separation, written into H5_PATH by experiments/euclid-cosmos/neighbors.py —
     run that script first). Rows with no neighbor found (neighbor_idx == -1)
     fall back to random_sameins so sameins is always populated.
   - lambda_geometric=0 matches the project default (see neighbours_train.py),
@@ -244,7 +245,7 @@ class EuclidCosmosModel(ConditionalFlowMatchingModule):
 # CONFIG — edit before running
 # ---------------------------------------------------------------------------
 H5_PATH     = "/n03data/fontirro/data_files/euclid_cosmos_pairs_vis_f150w_v3.h5"
-CKPT_DIR    = "/n03data/fontirro/euclid-cosmos/checkpoints/euclid-cosmos-vis-f150w/test-6-phase1/v1"  # where to save checkpoints and logs
+CKPT_DIR    = "/n03data/fontirro/euclid-cosmos/checkpoints/euclid-cosmos-vis-f150w/test-6-phase1/v2"  # where to save checkpoints and logs
 
 BATCH_SIZE  = 64
 NUM_WORKERS = 16
@@ -286,16 +287,18 @@ def collate_fn(batch, dataset):
         batch: list of tuples (anchor, cond, metadata) from the dataset. Each anchor and cond have
             shape (1, H_SIZE, W_SIZE) and metadata is a dict with keys "idx" and "anchor_survey".
         dataset: the EuclidCosmosDataset instance, used to fetch the precomputed same-instrument
-            neighbor image (neighbor_idx_euclid / neighbor_idx_cosmos, written by
+            neighbor image (neighbor_idx_sky_euclid / neighbor_idx_sky_cosmos, written by
             experiments/euclid-cosmos/neighbors.py) directly from its already-open HDF5 handle.
 
     Builds the 5-tuple the model expects:
       (anchor, samegal, sameins, masks, metadata)
 
-    sameins is the precomputed same-instrument neighbor (pixel-level 1-NN).
-    Rows with no precomputed neighbor (neighbor_idx == -1, e.g. beyond
-    MAX_NEIGHBOR_PIXEL_DIST) fall back to random_sameins so sameins is always
-    populated and masks stays all-True, same as before.
+    sameins is the precomputed same-instrument neighbor (sky-coordinate 1-NN:
+    closest other galaxy in the same survey by true angular separation, which
+    is what actually shares observing conditions/PSF — see nearest_neighbor_sky
+    in neighbors.py). Rows with no precomputed neighbor (neighbor_idx == -1,
+    e.g. beyond MAX_NEIGHBOR_SEP_ARCSEC) fall back to random_sameins so
+    sameins is always populated and masks stays all-True, same as before.
 
     Direction (which survey is anchor vs condition) is determined by the
     dataset: even indices → Euclid anchor, odd indices → COSMOS anchor.
@@ -313,9 +316,9 @@ def collate_fn(batch, dataset):
     for i, meta in enumerate(metadata):
         idx, survey = meta["idx"], meta["anchor_survey"]
         if survey == "euclid":
-            neighbor_key, img_key, norm_key = "neighbor_idx_euclid", "euclid_images_upscaled", "euclid_up"
+            neighbor_key, img_key, norm_key = "neighbor_idx_sky_euclid", "euclid_images_upscaled", "euclid_up"
         else:
-            neighbor_key, img_key, norm_key = "neighbor_idx_cosmos", "cosmos_images_downscaled", "cosmos_ds"
+            neighbor_key, img_key, norm_key = "neighbor_idx_sky_cosmos", "cosmos_images_downscaled", "cosmos_ds"
 
         j = int(f[neighbor_key][idx, 0])
         meta["sameins_idx"] = j  # -1 until random_sameins fills it in below, if this row is missing
