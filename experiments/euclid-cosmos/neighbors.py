@@ -63,7 +63,7 @@ def nearest_neighbor_pixel(images, max_distance=None, metric="euclidean"):
     - distance : (N,) float64 array. Pixel-space distance to that neighbor
         (np.inf where neighbor_idx == -1).
     """
-    images = np.asarray(images)
+    images = np.asarray(images) #every 
     n = images.shape[0]
     if n < 2:
         return np.full(n, -1, dtype=np.int64), np.full(n, np.inf)
