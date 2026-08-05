@@ -20,6 +20,7 @@ Usage:
 import os
 import sys
 import argparse
+from functools import partial
 import numpy as np
 import torch
 import matplotlib
@@ -86,7 +87,7 @@ def main():
         batch_size=args.batch_size,
         shuffle=False,
         num_workers=args.num_workers,
-        collate_fn=collate_fn,
+        collate_fn=partial(collate_fn, dataset=dataset),
     )
 
     # --- Build a same-instrument neighbor pool from the whole test set ---

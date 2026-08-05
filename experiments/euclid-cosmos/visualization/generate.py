@@ -25,6 +25,7 @@ Replot (no GPU):
 import argparse
 import os
 import sys
+from functools import partial
 from pathlib import Path
 
 import h5py
@@ -275,7 +276,7 @@ def main():
     chosen  = rng.choice(pool, size=min(args.n_images, len(pool)), replace=False).tolist()
 
     loader = DataLoader(Subset(dataset, chosen), batch_size=args.n_images,
-                        shuffle=False, num_workers=2, collate_fn=collate_fn)
+                        shuffle=False, num_workers=2, collate_fn=partial(collate_fn, dataset=dataset))
     euclid, cosmos, _, masks, _ = next(iter(loader))
 
     out_dir   = Path(args.out_dir)

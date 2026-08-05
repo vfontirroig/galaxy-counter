@@ -18,6 +18,7 @@ Usage:
 import os
 import sys
 import argparse
+from functools import partial
 import torch
 import numpy as np
 from torch.utils.data import DataLoader, Subset
@@ -76,7 +77,7 @@ def main():
     n = min(args.n_samples, len(dataset))
     indices = np.random.default_rng(42).choice(len(dataset), size=n, replace=False).tolist()
     loader = DataLoader(Subset(dataset, indices), batch_size=n,
-                        collate_fn=collate_fn, num_workers=2)
+                        collate_fn=partial(collate_fn, dataset=dataset), num_workers=2)
     euclid, cosmos, sameins, masks, _ = next(iter(loader))
     euclid  = euclid.to(device)   # (N, 1, H, W)
     cosmos  = cosmos.to(device)   # (N, 1, H, W)
