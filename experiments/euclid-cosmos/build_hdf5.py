@@ -133,7 +133,7 @@ def main():
     print(f"Pairs with both cutouts present: {len(catalog)}")
 
     #magnitude cut
-    catalog = catalog[catalog["mag_auto_f150w"] < 27].reset_index(drop=True)
+    catalog = catalog[catalog["mag_model_f150w"] < 25].reset_index(drop=True)
     print(f"Pairs after magnitude cut: {len(catalog)}")
 
     #check if the files exist
