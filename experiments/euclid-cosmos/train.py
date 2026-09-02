@@ -244,14 +244,14 @@ class EuclidCosmosModel(ConditionalFlowMatchingModule):
 # ---------------------------------------------------------------------------
 # CONFIG — edit before running
 # ---------------------------------------------------------------------------
-H5_PATH     = "/n03data/fontirro/data_files/euclid_cosmos_pairs_vis_f150w_v3.h5"
-CKPT_DIR    = "/n03data/fontirro/euclid-cosmos/checkpoints/euclid-cosmos-vis-f150w/test-6-phase1/v2"  # where to save checkpoints and logs
+H5_PATH     = "/n03data/fontirro/data_files/euclid_cosmos_pairs_vis_f150w_v4.h5"
+CKPT_DIR    = "/n03data/fontirro/euclid-cosmos/checkpoints/euclid-cosmos-vis-f150w/test-7-phase1/v2"  # where to save checkpoints and logs
 
 BATCH_SIZE  = 64
 NUM_WORKERS = 16
 VAL_RATIO   = 0.1
 TEST_RATIO  = 0.05
-NUM_STEPS   = 200_000
+NUM_STEPS   = 150_000
 IMAGE_SIZE  = 64      #Cutout spatial size
 LR          = 1e-4    #learning rate for AdamW optimizer
 
