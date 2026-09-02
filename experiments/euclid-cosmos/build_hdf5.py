@@ -28,28 +28,28 @@ import os
 # CONFIG — edit these before running
 # ---------------------------------------------------------------------------
 
-CATALOG_PATH = "/n03data/fontirro/data_files/cat_crossmatch_mag27_mag25.csv"  # path to the paired catalog
+CATALOG_PATH = "/n03data/fontirro/data_files/cat_crossmatch_v2.csv"  # path to the paired catalog
 
-EUCLID_COL = "50_file_euclid_vis"              # column name for the Euclid FITS file path
+EUCLID_COL = "59_raw_file_euclid_vis"       # column name for the Euclid FITS file path
 COSMOS_COL = "file_cosmos_f150w"            # column name for the COSMOS FITS file path
 
-EUCLID_EXISTS_COL = "cutout_euc_50_vis"    # boolean column: True if Euclid cutout exists
-COSMOS_EXISTS_COL = "cutout_cos_256_rot_f150w"  # boolean column: True if COSMOS cutout exists
+EUCLID_EXISTS_COL = "cutout_euc_59_vis"    # boolean column: 1 if Euclid cutout exists
+COSMOS_EXISTS_COL = "cutout_cos_256_rot_f150w"  # boolean column: 1 if COSMOS cutout exists
 
-EUCLID_DIR_PATH = "/n03data/fontirro/cutouts/euclid/50_cutouts/vis"  # base directory for Euclid VIS cutouts.
+EUCLID_DIR_PATH = "/n03data/fontirro/cutouts/euclid/59_raw_cutouts/vis"  # base directory for Euclid VIS cutouts.
 COSMOS_DIR_PATH = "/n03data/fontirro/cutouts/cosmos/256_cutouts_rotated/f150w/"  # base directory for COSMOS F150W cutouts.
 
-EUCLID_HDU = 1   # HDU index for Euclid data (usually 1 for science extension)
+EUCLID_HDU = 0   # HDU index for Euclid data (usually 1 for science extension)
 COSMOS_HDU = 0   # HDU index for COSMOS data (usually 0)
 
-OUTPUT_H5 = "/n03data/fontirro/data_files/euclid_cosmos_pairs_vis_f150w_v3.h5"
+OUTPUT_H5 = "/n03data/fontirro/data_files/euclid_cosmos_pairs_vis_f150w_v4.h5"
 
 NUM_WORKERS = 16  # parallel threads for loading + preprocessing
 
 H_SIZE = 64  # target spatial size for both Euclid and COSMOS
 W_SIZE = 64  # target spatial size for both Euclid and COSMOS
 
-EUCLID_CROP_SIZE = 40   # center-crop size applied to Euclid VIS cutouts
+EUCLID_CROP_SIZE = 36   # center-crop size applied to Euclid VIS cutouts
 COSMOS_CROP_SIZE = 120  # center-crop size applied to COSMOS F150W cutouts (rotated —
                          # too large a crop can dip into the NaN padding outside the
                          # rotated footprint; see cosmos_nan_frac below)
@@ -131,6 +131,10 @@ def main():
     mask = (catalog[EUCLID_EXISTS_COL] == 1) & (catalog[COSMOS_EXISTS_COL] == 1)
     catalog = catalog[mask].reset_index(drop=True)
     print(f"Pairs with both cutouts present: {len(catalog)}")
+
+    #magnitude cut
+    catalog = catalog[catalog["mag_auto_f150w"] < 27].reset_index(drop=True)
+    print(f"Pairs after magnitude cut: {len(catalog)}")
 
     #check if the files exist
     missing_euclid = []
