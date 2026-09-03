@@ -39,11 +39,14 @@ class Clamp:
         return image
     
 
-COSMOS_ZP = 23.9
+COSMOS_ZP = {
+    "F150W": 23.9,
+}
+
 
 # Euclid AB zeropoints per filter — obtained from Euclid's overview webpage.
 EUCLID_ZP = {
-    "VIS": 26.2,
+    "VIS": 24.5,
     "Y":   24.3,   
     "J":   24.5,   
     "H":   24.4,      
@@ -51,16 +54,16 @@ EUCLID_ZP = {
 
 
 class RescaleToCOSMOS:
-    """Rescales Euclid flux to the COSMOS zeropoint (23.9 AB).
+    """Rescales Euclid flux to the COSMOS zeropoint.
 
     COSMOS images are already at ZP=23.9, so they pass through unchanged.
-    Euclid images are multiplied by 10^((COSMOS_ZP - EUCLID_ZP[band]) / 2.5).
+    Euclid images are multiplied by 10^((COSMOS_ZP[band] - EUCLID_ZP[band]) / 2.5).
     """
 
-    def _scale(self, band: str) -> float:
-        if band not in EUCLID_ZP:
+    def _scale(self, band_euclid, band_cosmos: str) -> float:
+        if band_euclid not in EUCLID_ZP:
             return 1.0  # COSMOS band — no rescaling needed
-        return 10.0 ** ((COSMOS_ZP - EUCLID_ZP[band]) / 2.5)
+        return 10.0 ** ((COSMOS_ZP[band_cosmos] - EUCLID_ZP[band_euclid]) / 2.5)
 
     def forward(self, image: torch.Tensor, band: str) -> torch.Tensor:
         return image.clone() * self._scale(band)
@@ -268,7 +271,7 @@ def preprocess_image_v2(
 
 
 def main():
-    """Demonstrate the preprocessing pipeline on one Euclid VIS and one COSMOS F115W cutout."""
+    """Demonstrate the preprocessing pipeline on one Euclid VIS and one COSMOS F150W cutout."""
     
     import numpy as np
     from astropy.io import fits
