@@ -39,8 +39,8 @@ class Clamp:
         return image
     
 
-#COSMOS ZP per filter. This is obtained from the formula: ZP = -2.5*np.log10(hdr['PIXAR_SR']*[sr/pix] * 1e6) + 8.9   # 28.0865
-#PIXAR_SR (for 30ms) is the pixel area in steradians, and 1e6 converts to microJanskys. The constant 8.9 is a calibration offset.
+#COSMOS ZP per filter. This is obtained from the formula: ZP = -2.5*np.log10(hdr['PIXAR_SR']*[sr/pix] * 1e6) + 8.9  = 28.0865
+#PIXAR_SR (for 30ms) is the pixel area in steradians. 1e6 converts to microJanskys. The constant 8.9 is a calibration offset.
 #The formula was obtained from JWST documentation: https://jwst-docs.stsci.edu/jwst-near-infrared-camera/nircam-pipeline-reference/nircam-calibration-pipeline-reference/nircam-image-calibration/nircam-image-calibration-zeropoints
 COSMOS_ZP = {
     "F150W": 28.1,
