@@ -16,7 +16,7 @@ PLOT_DIR="/n03data/fontirro/euclid-cosmos/plots_model/euclid-cosmos-vis-f150w/te
 
 python /n03data/fontirro/euclid-cosmos/galaxy-counter/experiments/euclid-cosmos/visualization/umap_latent.py \
     --checkpoint "${CKPT_DIR}/best-epoch=79-step=97000.ckpt" \
-    --h5         "/n03data/fontirro/data_files/euclid_cosmos_pairs_vis_f150w_v3.h5" \
+    --h5         "/n03data/fontirro/data_files/euclid_cosmos_pairs_vis_f150w_v4.h5" \
     --out        "${PLOT_DIR}/umap_test.png" \
     --out-cutouts "${PLOT_DIR}/umap_test_cutouts.png" \
     --indices    "${CKPT_DIR}/test_indices.npy"
