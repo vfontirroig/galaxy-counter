@@ -39,12 +39,15 @@ class Clamp:
         return image
     
 
+#COSMOS ZP per filter. This is obtained from the formula: ZP = -2.5*np.log10(hdr['PIXAR_SR']*[sr/pix] * 1e6) + 8.9   # 28.0865
+#PIXAR_SR (for 30ms) is the pixel area in steradians, and 1e6 converts to microJanskys. The constant 8.9 is a calibration offset.
+#The formula was obtained from JWST documentation: https://jwst-docs.stsci.edu/jwst-near-infrared-camera/nircam-pipeline-reference/nircam-calibration-pipeline-reference/nircam-image-calibration/nircam-image-calibration-zeropoints
 COSMOS_ZP = {
-    "F150W": 23.9,
+    "F150W": 28.1,
 }
 
 
-# Euclid AB zeropoints per filter — obtained from Euclid's overview webpage.
+# Euclid AB zeropoints per filter — obtained from Euclid's fits file header.
 EUCLID_ZP = {
     "VIS": 24.5,
     "Y":   24.3,   
@@ -53,17 +56,75 @@ EUCLID_ZP = {
 }
 
 
-class RescaleToCOSMOS:
-    """Rescales Euclid flux to the COSMOS zeropoint.
+# --- Common output basis: COSMOS-Web's native MJy/sr (surface brightness) ----
+#
+# The two surveys ship in different KINDS of unit, and neither is microjansky:
+#   Euclid MER mosaics : BUNIT 'ADU/s' (VIS) / 'ELECTRON/s' (NISP) — a per-pixel
+#       instrumental count rate. MER does not apply the flux calibration to the
+#       pixels, it hands it over as the MAGZERO keyword (EUCLID_ZP above).
+#   COSMOS-Web NIRCam  : BUNIT 'MJy/sr' — surface brightness, already calibrated
+#       by the JWST pipeline's Stage 2 photom step.
+#
+# We convert onto MJy/sr rather than onto a per-pixel flux (uJy/px) basis.
+# Surface brightness makes no reference to the pixel grid, so it divides out the
+# ~11x solid-angle difference between Euclid's 0.1"/px and COSMOS-Web's 0.03"/px.
+# That matters because RangeCompress's softening scale is an ABSOLUTE constant:
+# on a per-pixel basis the 11x survives and lands the two surveys on different
+# parts of the arcsinh curve (COSMOS compressed, Euclid effectively linear).
 
-    COSMOS images are already at ZP=23.9, so they pass through unchanged.
-    Euclid images are multiplied by 10^((COSMOS_ZP[band] - EUCLID_ZP[band]) / 2.5).
+ARCSEC_IN_RAD = 4.8481368111e-6
+# 1 MJy/sr expressed in uJy/arcsec^2  (1 MJy = 1e12 uJy)
+UJY_PER_ARCSEC2_PER_MJY_SR = 1e12 * ARCSEC_IN_RAD ** 2   # 23.5044
+
+EUCLID_PIXEL_SCALE_ARCSEC = 0.10  # MER mosaics; CD2_2 = 2.7778e-5 deg/px
+
+
+def euclid_count_rate_to_mjy_sr(
+    magzero: float,
+    pixel_scale_arcsec: float = EUCLID_PIXEL_SCALE_ARCSEC,
+) -> float:
+    """Factor turning Euclid pixel values (ADU/s or e-/s) into MJy/sr.
+
+    MAGZERO is quoted against the mosaic's own BUNIT, so it converts a pixel
+    value into a per-pixel flux; dividing by the pixel area gives a surface
+    brightness, which is then expressed in MJy/sr.
+    """
+    ujy_per_pixel = 10.0 ** ((23.9 - magzero) / 2.5)   # 23.9 == the ZP of microjansky
+    ujy_per_arcsec2 = ujy_per_pixel / pixel_scale_arcsec ** 2
+    return ujy_per_arcsec2 / UJY_PER_ARCSEC2_PER_MJY_SR
+
+
+# band -> multiplicative factor onto MJy/sr. COSMOS-Web bands are already there
+# and stay 1.0 for ANY of the released pixel scales (20/30/60 mas), precisely
+# because surface brightness is grid-independent.
+# NOTE: only VIS is verified against a real header (MAGZERO=24.5, DR1_R1). The
+# NISP entries in EUCLID_ZP are unconfirmed — a NIR_Y tile reads MAGZERO=29.8
+# with BUNIT 'ELECTRON/s', so check them before using Y/J/H.
+BAND_TO_MJY_SR = {band: 1.0 for band in COSMOS_ZP}
+BAND_TO_MJY_SR.update(
+    {band: euclid_count_rate_to_mjy_sr(zp) for band, zp in EUCLID_ZP.items()}
+)
+
+
+class RescaleToCOSMOS:
+    """Puts every band on COSMOS-Web's native basis: MJy/sr (surface brightness).
+
+    COSMOS-Web bands pass through unchanged; Euclid bands are multiplied by
+    BAND_TO_MJY_SR[band], derived from that mosaic's MAGZERO and pixel scale.
+
+    Unknown bands raise rather than passing through. A missing entry used to mean
+    "no rescaling needed", which is how COSMOS ended up ~47x too bright relative
+    to Euclid: its pixels were treated as microjansky when they are MJy/sr.
     """
 
-    def _scale(self, band_euclid, band_cosmos: str) -> float:
-        if band_euclid not in EUCLID_ZP:
-            return 1.0  # COSMOS band — no rescaling needed
-        return 10.0 ** ((COSMOS_ZP[band_cosmos] - EUCLID_ZP[band_euclid]) / 2.5)
+    def _scale(self, band: str) -> float:
+        if band not in BAND_TO_MJY_SR:
+            raise KeyError(
+                f"No photometric calibration for band {band!r}. Add its Euclid "
+                f"MAGZERO to EUCLID_ZP, or list it in COSMOS_ZP if it is already "
+                f"in MJy/sr. Do not assume a band needs no rescaling."
+            )
+        return BAND_TO_MJY_SR[band]
 
     def forward(self, image: torch.Tensor, band: str) -> torch.Tensor:
         return image.clone() * self._scale(band)
