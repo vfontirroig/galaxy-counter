@@ -199,11 +199,14 @@ class EuclidCosmosModel(ConditionalFlowMatchingModule):
                     )
                     for _ in range(num_samples)
                 ]
+                # averaging the independent draws cancels per-sample stochastic
+                # scatter, leaving what the model reproduces consistently
+                mean_generation = torch.stack(generations).mean(dim=0)  # (n, 1, H, W)
 
             col_titles = (
                 [samegal_label, "Same-instrument input", real_label]
                 + [f"Generated #{k + 1}" for k in range(num_samples)]
-                + ["Residual (Gen #1 - Real)"]
+                + [f"Mean of {num_samples} generations"]
             )
             n_cols = len(col_titles)
 
@@ -213,16 +216,13 @@ class EuclidCosmosModel(ConditionalFlowMatchingModule):
             for j, title in enumerate(col_titles):
                 axes[0, j].set_title(title, fontsize=12)
             for i in range(n):
-                imgs = [con[i], sam[i, 0], anc[i]] + [gen[i] for gen in generations]
+                imgs = ([con[i], sam[i, 0], anc[i]]
+                        + [gen[i] for gen in generations]
+                        + [mean_generation[i]])
                 for j, img in enumerate(imgs):
                     arr = img.squeeze().cpu().float().numpy()
                     axes[i, j].imshow(arr, cmap="plasma")
                     axes[i, j].axis("off")
-
-                residual = (generations[0][i] - anc[i]).squeeze().cpu().float().numpy()
-                vmax = np.abs(residual).max()
-                axes[i, n_cols - 1].imshow(residual, cmap="coolwarm", vmin=-vmax, vmax=vmax)
-                axes[i, n_cols - 1].axis("off")
 
                 axes[i, 0].text(0.02, 0.98, f"idx={ids[i]}", fontsize=16,
                                 ha="left", va="top", color="magenta",
