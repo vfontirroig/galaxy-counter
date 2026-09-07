@@ -209,6 +209,24 @@ def main():
     umap_emb2 = umap.UMAP(**umap_params).fit_transform(all_emb2)
     euc_u2, cos_u2 = umap_emb2[:N], umap_emb2[N:]
 
+    # --- Find the encoder_1 blobs (needed for the main plot's labels) ---
+    print("Finding regions from UMAP's own manifold graph...")
+    all_groups = _regions_from_graph(reducer1)
+    if all_groups is None:
+        print(f"  graph gives no separation; falling back to "
+              f"KMeans k={args.n_groups} on the 2-D coordinates")
+        all_groups = _assign_groups(umap_emb1, args.n_groups, args.seed)
+    all_groups = _renumber_left_to_right(all_groups, umap_emb1)
+    n_groups = int(all_groups.max()) + 1
+    euc_groups, cos_groups = all_groups[:N], all_groups[N:]
+
+    print(f"encoder_1 UMAP split into {n_groups} blobs "
+          f"(numbered left-to-right by UMAP 1):")
+    for g in range(n_groups):
+        n_euc, n_cos = int((euc_groups == g).sum()), int((cos_groups == g).sum())
+        owner = "Euclid" if n_euc > n_cos else "COSMOS"
+        print(f"  blob {g}: {n_euc:5d} Euclid + {n_cos:5d} COSMOS -> {owner}-dominated")
+
     # --- Pick random pairs to highlight ---
     rng = np.random.default_rng(args.seed)
     pair_ids   = rng.choice(N, size=min(args.n_highlight, N), replace=False)
@@ -238,6 +256,18 @@ def main():
         Line2D([0], [0], marker="*", color="w", markerfacecolor="gray", markersize=12,
                markeredgecolor="black", label=f"{len(pair_ids)} highlighted pairs"),
     ]
+    # Blob labels, only on encoder_1 — the blobs were found in this embedding, so
+    # the same numbers would be meaningless over encoder_2's different layout.
+    # Boxed text rather than a bare digit, so they cannot be confused with the
+    # highlighted-pair numbers, which are also digits. Median not mean, so the
+    # label stays inside an elongated or crescent-shaped blob.
+    for g in range(n_groups):
+        cx, cy = np.median(umap_emb1[all_groups == g], axis=0)
+        ax1.annotate(f"blob {g}", xy=(cx, cy), ha="center", va="center",
+                     fontsize=13, fontweight="bold", color="black", zorder=7,
+                     bbox=dict(boxstyle="round,pad=0.3", facecolor="white",
+                               edgecolor="black", alpha=0.85))
+
     ax1.legend(handles=legend_handles, fontsize=12)
     ax1.set_title("encoder_1 — same galaxy (physics)", fontsize=18)
     ax1.set_xlabel("UMAP 1", fontsize=15)
@@ -312,32 +342,15 @@ def main():
 
     # --- Assign every galaxy to the encoder_1 blob its points lands in ---
     if args.out_groups is not None:
-        # Blobs are found on ALL 2N points, so they describe regions of the shared
-        # space rather than one survey's clumps. Then each galaxy gets the blob its
-        # own point fell into — which is how a COSMOS galaxy can be labelled as
-        # living inside Euclid's blob.
-        print("Finding regions from UMAP's own manifold graph...")
-        all_groups = _regions_from_graph(reducer1)
-        if all_groups is None:
-            print(f"  graph gives no separation; falling back to "
-                  f"KMeans k={args.n_groups} on the 2-D coordinates")
-            all_groups = _assign_groups(umap_emb1, args.n_groups, args.seed)
-        all_groups = _renumber_left_to_right(all_groups, umap_emb1)
-        n_groups = int(all_groups.max()) + 1
-        euc_groups, cos_groups = all_groups[:N], all_groups[N:]
-
+        # Blobs were already found above (they label the main plot). They come from
+        # ALL 2N points, so they describe regions of the shared space rather than
+        # one survey's clumps, and each galaxy gets the blob its own point fell
+        # into — which is how a COSMOS galaxy can sit inside Euclid's blob.
+        #
         # euc_u1 and cos_u1 share row order, so row i of either is galaxy indices[i]
         groups = cos_groups if args.group_survey == "cosmos" else euc_groups
         pts = cos_u1 if args.group_survey == "cosmos" else euc_u1
         sizes = [int((groups == g).sum()) for g in range(n_groups)]
-
-        print(f"encoder_1 UMAP split into {n_groups} blobs "
-              f"(numbered left-to-right by UMAP 1):")
-        for g in range(n_groups):
-            n_euc, n_cos = int((euc_groups == g).sum()), int((cos_groups == g).sum())
-            owner = "Euclid" if n_euc > n_cos else "COSMOS"
-            print(f"  blob {g}: {n_euc:5d} Euclid + {n_cos:5d} COSMOS "
-                  f"-> {owner}-dominated")
 
         # Per-galaxy table. Both columns are given so you can find the crossovers:
         # a galaxy whose two views landed in different blobs has euclid_group !=
