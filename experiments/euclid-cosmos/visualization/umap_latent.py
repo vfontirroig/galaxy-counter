@@ -264,7 +264,7 @@ def main():
     # crowds the axes or the legend. These are tied to THIS embedding, so clear
     # or revisit them if the UMAP layout changes (new checkpoint, rebuilt HDF5,
     # different seed). Blobs not listed fall back to the automatic placement.
-    blob_label_pos = {0: (-7.5, 12.0)}
+    blob_label_pos = {0: (-6.5, 12.0)}
 
     for g in range(n_groups):
         blob = umap_emb1[all_groups == g]
@@ -274,7 +274,7 @@ def main():
             xy, offset = (np.median(blob[:, 0]), blob[:, 1].max()), (0, 8)
         ax1.annotate(str(g), xy=xy, xytext=offset, textcoords="offset points",
                      ha="center", va="bottom",
-                     fontsize=20, fontweight="bold", color="black", zorder=7)
+                     fontsize=15, color="black", zorder=7)
 
     ax1.legend(handles=legend_handles, fontsize=12)
     ax1.set_title("encoder_1 — same galaxy (physics)", fontsize=18)
