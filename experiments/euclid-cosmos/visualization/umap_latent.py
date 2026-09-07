@@ -44,6 +44,69 @@ def _percentile_scale(arr):
     return np.clip((arr - lo) / (hi - lo + 1e-8), 0, 1)
 
 
+def _regions_from_graph(reducer, min_size=25):
+    """Region label per point, taken from UMAP's own manifold graph.
+
+    reducer.graph_ is the fuzzy simplicial set UMAP actually embedded. Two points
+    sit in the same connected component of it iff UMAP saw them as part of one
+    continuous manifold, so its components ARE the separated blobs — exactly,
+    with no cluster count to choose and no centroid heuristics.
+
+    UMAP itself returns no cluster labels (fit_transform gives coordinates only),
+    so this is the closest thing to a native answer. It only helps when the graph
+    is in fact disconnected, which depends on n_neighbors: more neighbours glue
+    components together. Returns None when it cannot separate anything, so the
+    caller can fall back to KMeans.
+
+    Components smaller than min_size are treated as stragglers and merged into
+    label -1 rather than becoming their own "blob".
+    """
+    from scipy.sparse.csgraph import connected_components
+
+    n_comp, raw = connected_components(reducer.graph_, directed=False)
+    print(f"  UMAP graph has {n_comp} connected component(s)")
+    if n_comp < 2:
+        return None
+
+    keep = [c for c in range(n_comp) if (raw == c).sum() >= min_size]
+    if len(keep) < 2:
+        print(f"  only {len(keep)} component(s) above min_size={min_size}")
+        return None
+
+    labels = np.full(len(raw), -1, dtype=int)
+    for new, c in enumerate(keep):
+        labels[raw == c] = new
+    n_stray = int((labels == -1).sum())
+    if n_stray:
+        print(f"  {n_stray} point(s) in components below min_size -> label -1")
+    return labels
+
+
+def _assign_groups(coords, n_groups, seed):
+    """Fallback when the UMAP graph is fully connected: KMeans on the 2-D coords.
+
+    Less principled than _regions_from_graph — it will happily force `n_groups`
+    blobs whether or not that many exist — but it always returns something, and
+    unlike a hand-picked coordinate cut (e.g. "UMAP 1 < 5") it does not need
+    re-eyeballing when the embedding moves.
+    """
+    from sklearn.cluster import KMeans
+    return KMeans(n_clusters=n_groups, n_init=10,
+                  random_state=seed).fit_predict(coords)
+
+
+def _renumber_left_to_right(labels, coords):
+    """Relabel blobs 0..k-1 by centroid UMAP 1, leaving label -1 untouched.
+
+    Both labelling routes hand back arbitrary numbering, so this makes "blob 0"
+    mean "leftmost in the figure" either way, and keeps it stable across runs.
+    """
+    present = sorted({int(g) for g in labels} - {-1})
+    order = sorted(present, key=lambda g: coords[labels == g, 0].mean())
+    remap = {old: new for new, old in enumerate(order)}
+    return np.array([remap[int(g)] if g >= 0 else -1 for g in labels])
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--checkpoint",  required=True)
@@ -58,6 +121,22 @@ def main():
                    help="Number of galaxy pairs to encode. Set to -1 to use all pairs (ignored if --indices given)")
     p.add_argument("--n-highlight", type=int, default=8,
                    help="Number of random pairs to highlight on encoder_1 plot")
+    p.add_argument("--out-groups", default=None,
+                   help="If given, assign every galaxy to a blob in the encoder_1 "
+                        "UMAP and write a CSV of (dataset_idx -> group) here. "
+                        "A _cutouts.png with one row per group is saved alongside it.")
+    p.add_argument("--group-survey", choices=["cosmos", "euclid"], default="cosmos",
+                   help="Which survey's galaxies to tabulate and show cutouts for "
+                        "(default: cosmos). The blobs themselves are always found "
+                        "using BOTH surveys' points, so a COSMOS galaxy sitting "
+                        "inside Euclid's blob is labelled as being in that blob.")
+    p.add_argument("--n-groups",  type=int, default=3,
+                   help="FALLBACK ONLY. Blobs normally come from the connected "
+                        "components of UMAP's own graph, which needs no count. This "
+                        "k is used only if that graph turns out fully connected "
+                        "(default: 3 — the Euclid blob plus the two COSMOS blobs)")
+    p.add_argument("--per-group", type=int, default=8,
+                   help="Cutouts to show per group, most central first (default: 8)")
     p.add_argument("--batch-size",  type=int, default=256)
     p.add_argument("--num-workers", type=int, default=4)
     p.add_argument("--seed",        type=int, default=42)
@@ -121,7 +200,8 @@ def main():
 
     print("Computing UMAP for encoder_1 (same-galaxy / physics)...")
     all_emb1  = np.concatenate([euclid_emb1, cosmos_emb1], axis=0)
-    umap_emb1 = umap.UMAP(**umap_params).fit_transform(all_emb1)
+    reducer1  = umap.UMAP(**umap_params)   # kept: reducer1.graph_ defines the regions
+    umap_emb1 = reducer1.fit_transform(all_emb1)
     euc_u1, cos_u1 = umap_emb1[:N], umap_emb1[N:]
 
     print("Computing UMAP for encoder_2 (same-instrument)...")
@@ -229,6 +309,88 @@ def main():
         plt.savefig(args.out_cutouts, dpi=150, bbox_inches="tight")
         plt.close()
         print(f"Saved cutouts: {args.out_cutouts}")
+
+    # --- Assign every galaxy to the encoder_1 blob its points lands in ---
+    if args.out_groups is not None:
+        # Blobs are found on ALL 2N points, so they describe regions of the shared
+        # space rather than one survey's clumps. Then each galaxy gets the blob its
+        # own point fell into — which is how a COSMOS galaxy can be labelled as
+        # living inside Euclid's blob.
+        print("Finding regions from UMAP's own manifold graph...")
+        all_groups = _regions_from_graph(reducer1)
+        if all_groups is None:
+            print(f"  graph gives no separation; falling back to "
+                  f"KMeans k={args.n_groups} on the 2-D coordinates")
+            all_groups = _assign_groups(umap_emb1, args.n_groups, args.seed)
+        all_groups = _renumber_left_to_right(all_groups, umap_emb1)
+        n_groups = int(all_groups.max()) + 1
+        euc_groups, cos_groups = all_groups[:N], all_groups[N:]
+
+        # euc_u1 and cos_u1 share row order, so row i of either is galaxy indices[i]
+        groups = cos_groups if args.group_survey == "cosmos" else euc_groups
+        pts = cos_u1 if args.group_survey == "cosmos" else euc_u1
+        sizes = [int((groups == g).sum()) for g in range(n_groups)]
+
+        print(f"encoder_1 UMAP split into {n_groups} blobs "
+              f"(numbered left-to-right by UMAP 1):")
+        for g in range(n_groups):
+            n_euc, n_cos = int((euc_groups == g).sum()), int((cos_groups == g).sum())
+            owner = "Euclid" if n_euc > n_cos else "COSMOS"
+            print(f"  blob {g}: {n_euc:5d} Euclid + {n_cos:5d} COSMOS "
+                  f"-> {owner}-dominated")
+
+        # Per-galaxy table. Both columns are given so you can find the crossovers:
+        # a galaxy whose two views landed in different blobs has euclid_group !=
+        # cosmos_group, and same_blob==1 means the model put them together.
+        # A group of -1 means the point sat in a tiny off-manifold component.
+        with open(args.out_groups, "w") as fh:
+            fh.write("dataset_idx,euclid_group,cosmos_group,same_blob,umap_1,umap_2\n")
+            for i in range(N):
+                # two unassigned points (both -1) are not "in the same blob"
+                same = int(euc_groups[i] >= 0 and euc_groups[i] == cos_groups[i])
+                fh.write(f"{indices[i]},{euc_groups[i]},{cos_groups[i]},{same},"
+                         f"{pts[i, 0]:.6f},{pts[i, 1]:.6f}\n")
+        n_together = int(((euc_groups == cos_groups) & (euc_groups >= 0)).sum())
+        print(f"Saved group assignment: {args.out_groups}  ({N} galaxies, "
+              f"{n_together} with both views in the same blob)")
+
+        # cutouts of the most central galaxies in each group, to see what is inside
+        stem = os.path.splitext(args.out_groups)[0]
+        grid_path = f"{stem}_cutouts.png"
+        fig3, axes3 = plt.subplots(n_groups, args.per_group,
+                                   figsize=(2.4 * args.per_group, 2.7 * n_groups),
+                                   squeeze=False)
+        for g in range(n_groups):
+            members = np.flatnonzero(groups == g)
+            if len(members):
+                centroid = pts[members].mean(axis=0)
+                central = members[np.argsort(
+                    np.linalg.norm(pts[members] - centroid, axis=1))]
+            else:
+                central = members  # no galaxies of this survey here; row stays blank
+            for c in range(args.per_group):
+                ax = axes3[g, c]
+                ax.set_xticks([])
+                ax.set_yticks([])
+                if c >= len(central):
+                    ax.axis("off")
+                    continue
+                pos = int(central[c])
+                e_img, c_img, meta = subset[pos]
+                img = c_img if args.group_survey == "cosmos" else e_img
+                ax.imshow(_percentile_scale(img.squeeze(0).numpy()),
+                          cmap="plasma", origin="lower")
+                ax.set_title(f"idx={meta['idx']}", fontsize=10)
+            n_euc, n_cos = int((euc_groups == g).sum()), int((cos_groups == g).sum())
+            owner = "Euclid" if n_euc > n_cos else "COSMOS"
+            axes3[g, 0].set_ylabel(f"blob {g} ({owner})\n{sizes[g]} {args.group_survey}",
+                                   fontsize=13, fontweight="bold")
+        fig3.suptitle(f"encoder_1 blobs — {args.per_group} most central "
+                      f"{args.group_survey} galaxies in each", fontsize=15)
+        plt.tight_layout(rect=[0, 0, 1, 0.96])
+        plt.savefig(grid_path, dpi=150, bbox_inches="tight")
+        plt.close()
+        print(f"Saved group cutouts: {grid_path}")
 
 
 if __name__ == "__main__":

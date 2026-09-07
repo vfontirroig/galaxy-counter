@@ -19,4 +19,5 @@ python /n03data/fontirro/euclid-cosmos/galaxy-counter/experiments/euclid-cosmos/
     --h5         "/n03data/fontirro/data_files/euclid_cosmos_pairs_vis_f150w_v4.h5" \
     --out        "${PLOT_DIR}/umap_test_1.png" \
     --out-cutouts "${PLOT_DIR}/umap_test_cutouts_1.png" \
+    --out-groups "${PLOT_DIR}/umap_groups_1.csv" \
     --indices    "${CKPT_DIR}/test_indices.npy"
