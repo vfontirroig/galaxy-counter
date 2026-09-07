@@ -260,10 +260,19 @@ def main():
     # the same numbers would be meaningless over encoder_2's different layout.
     # Placed just above each blob's top edge (median x, max y) rather than at the
     # centroid, so they sit beside the points instead of on top of them.
+    # Hand-placed positions in data coordinates, for blobs whose automatic label
+    # crowds the axes or the legend. These are tied to THIS embedding, so clear
+    # or revisit them if the UMAP layout changes (new checkpoint, rebuilt HDF5,
+    # different seed). Blobs not listed fall back to the automatic placement.
+    blob_label_pos = {0: (-7.5, 12.0)}
+
     for g in range(n_groups):
         blob = umap_emb1[all_groups == g]
-        ax1.annotate(str(g), xy=(np.median(blob[:, 0]), blob[:, 1].max()),
-                     xytext=(0, 8), textcoords="offset points",
+        if g in blob_label_pos:
+            xy, offset = blob_label_pos[g], (0, 0)
+        else:
+            xy, offset = (np.median(blob[:, 0]), blob[:, 1].max()), (0, 8)
+        ax1.annotate(str(g), xy=xy, xytext=offset, textcoords="offset points",
                      ha="center", va="bottom",
                      fontsize=20, fontweight="bold", color="black", zorder=7)
 
