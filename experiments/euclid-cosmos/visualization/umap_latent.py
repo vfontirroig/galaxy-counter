@@ -258,15 +258,14 @@ def main():
     ]
     # Blob labels, only on encoder_1 — the blobs were found in this embedding, so
     # the same numbers would be meaningless over encoder_2's different layout.
-    # Boxed text rather than a bare digit, so they cannot be confused with the
-    # highlighted-pair numbers, which are also digits. Median not mean, so the
-    # label stays inside an elongated or crescent-shaped blob.
+    # Placed just above each blob's top edge (median x, max y) rather than at the
+    # centroid, so they sit beside the points instead of on top of them.
     for g in range(n_groups):
-        cx, cy = np.median(umap_emb1[all_groups == g], axis=0)
-        ax1.annotate(f"blob {g}", xy=(cx, cy), ha="center", va="center",
-                     fontsize=13, fontweight="bold", color="black", zorder=7,
-                     bbox=dict(boxstyle="round,pad=0.3", facecolor="white",
-                               edgecolor="black", alpha=0.85))
+        blob = umap_emb1[all_groups == g]
+        ax1.annotate(str(g), xy=(np.median(blob[:, 0]), blob[:, 1].max()),
+                     xytext=(0, 8), textcoords="offset points",
+                     ha="center", va="bottom",
+                     fontsize=20, fontweight="bold", color="black", zorder=7)
 
     ax1.legend(handles=legend_handles, fontsize=12)
     ax1.set_title("encoder_1 — same galaxy (physics)", fontsize=18)
