@@ -180,10 +180,6 @@ def main():
                    help="Number of galaxy pairs to encode. Set to -1 to use all pairs (ignored if --indices given)")
     p.add_argument("--n-highlight", type=int, default=8,
                    help="Number of random pairs to highlight on encoder_1 plot")
-    p.add_argument("--out-groups", default=None,
-                   help="If given, assign every galaxy to a blob in the encoder_1 "
-                        "UMAP and write a CSV of (dataset_idx -> group) here. "
-                        "A _cutouts.png with one row per group is saved alongside it.")
     p.add_argument("--group-survey", choices=["cosmos", "euclid"], default="cosmos",
                    help="Which survey's galaxies to tabulate and show cutouts for "
                         "(default: cosmos). The blobs themselves are always found "
@@ -398,65 +394,67 @@ def main():
         plt.close()
         print(f"Saved cutouts: {args.out_cutouts}")
 
-    # --- Assign every galaxy to the encoder_1 blob its points lands in ---
-    if args.out_groups is not None:
-        # Blobs were already found above (they label the main plot). They come from
-        # ALL 2N points, so they describe regions of the shared space rather than
-        # one survey's clumps, and each galaxy gets the blob its own point fell
-        # into — which is how a COSMOS galaxy can sit inside Euclid's blob.
-        #
-        # euc_u1 and cos_u1 share row order, so row i of either is galaxy indices[i]
-        n_groups = n_groups1
-        euc_groups, cos_groups = groups1[:N], groups1[N:]
-        groups = cos_groups if args.group_survey == "cosmos" else euc_groups
-        pts = cos_u1 if args.group_survey == "cosmos" else euc_u1
-        sizes = [int((groups == g).sum()) for g in range(n_groups)]
+    # --- Assign every galaxy to the blob its point lands in, per encoder ---
+    # Always written, next to --out. Blobs were already found above (they label
+    # the main plot). They come from ALL 2N points, so they describe regions of
+    # the shared space rather than one survey's clumps, and each galaxy gets the
+    # blob its own point fell into — which is how a COSMOS galaxy can sit inside
+    # Euclid's blob.
+    #
+    # euc_u1 and cos_u1 share row order, so row i of either is galaxy indices[i]
+    n_groups = n_groups1
+    euc_groups, cos_groups = groups1[:N], groups1[N:]
+    groups = cos_groups if args.group_survey == "cosmos" else euc_groups
+    pts = cos_u1 if args.group_survey == "cosmos" else euc_u1
+    sizes = [int((groups == g).sum()) for g in range(n_groups)]
 
-        stem, ext = os.path.splitext(args.out_groups)
+    out_dir = os.path.dirname(os.path.abspath(args.out))
 
-        # One table per encoder. The blob numbers are per-encoder and unrelated
-        # between the two files, so they are kept separate rather than joined.
-        _write_group_csv(args.out_groups, indices, groups1, N, pts)
-        _write_group_csv(f"{stem}_encoder2{ext}", indices, groups2, N,
-                         cos_u2 if args.group_survey == "cosmos" else euc_u2)
+    # One table per encoder. The blob numbers are per-encoder and unrelated
+    # between the two files, so they are kept separate rather than joined —
+    # join them on dataset_idx to compare.
+    _write_group_csv(os.path.join(out_dir, "umap_groups_encoder_1.csv"),
+                     indices, groups1, N, pts)
+    _write_group_csv(os.path.join(out_dir, "umap_groups_encoder_2.csv"),
+                     indices, groups2, N,
+                     cos_u2 if args.group_survey == "cosmos" else euc_u2)
 
-        # cutouts of the most central galaxies in each encoder_1 group
-
-        grid_path = f"{stem}_cutouts.png"
-        fig3, axes3 = plt.subplots(n_groups, args.per_group,
-                                   figsize=(2.4 * args.per_group, 2.7 * n_groups),
-                                   squeeze=False)
-        for g in range(n_groups):
-            members = np.flatnonzero(groups == g)
-            if len(members):
-                centroid = pts[members].mean(axis=0)
-                central = members[np.argsort(
-                    np.linalg.norm(pts[members] - centroid, axis=1))]
-            else:
-                central = members  # no galaxies of this survey here; row stays blank
-            for c in range(args.per_group):
-                ax = axes3[g, c]
-                ax.set_xticks([])
-                ax.set_yticks([])
-                if c >= len(central):
-                    ax.axis("off")
-                    continue
-                pos = int(central[c])
-                e_img, c_img, meta = subset[pos]
-                img = c_img if args.group_survey == "cosmos" else e_img
-                ax.imshow(_percentile_scale(img.squeeze(0).numpy()),
-                          cmap="plasma", origin="lower")
-                ax.set_title(f"idx={meta['idx']}", fontsize=10)
-            n_euc, n_cos = int((euc_groups == g).sum()), int((cos_groups == g).sum())
-            owner = "Euclid" if n_euc > n_cos else "COSMOS"
-            axes3[g, 0].set_ylabel(f"blob {g} ({owner})\n{sizes[g]} {args.group_survey}",
-                                   fontsize=13, fontweight="bold")
-        fig3.suptitle(f"encoder_1 blobs — {args.per_group} most central "
-                      f"{args.group_survey} galaxies in each", fontsize=15)
-        plt.tight_layout(rect=[0, 0, 1, 0.96])
-        plt.savefig(grid_path, dpi=150, bbox_inches="tight")
-        plt.close()
-        print(f"Saved group cutouts: {grid_path}")
+    # cutouts of the most central galaxies in each encoder_1 blob
+    grid_path = os.path.join(out_dir, "umap_groups_encoder_1_cutouts.png")
+    fig3, axes3 = plt.subplots(n_groups, args.per_group,
+                               figsize=(2.4 * args.per_group, 2.7 * n_groups),
+                               squeeze=False)
+    for g in range(n_groups):
+        members = np.flatnonzero(groups == g)
+        if len(members):
+            centroid = pts[members].mean(axis=0)
+            central = members[np.argsort(
+                np.linalg.norm(pts[members] - centroid, axis=1))]
+        else:
+            central = members  # no galaxies of this survey here; row stays blank
+        for c in range(args.per_group):
+            ax = axes3[g, c]
+            ax.set_xticks([])
+            ax.set_yticks([])
+            if c >= len(central):
+                ax.axis("off")
+                continue
+            pos = int(central[c])
+            e_img, c_img, meta = subset[pos]
+            img = c_img if args.group_survey == "cosmos" else e_img
+            ax.imshow(_percentile_scale(img.squeeze(0).numpy()),
+                      cmap="plasma", origin="lower")
+            ax.set_title(f"idx={meta['idx']}", fontsize=10)
+        n_euc, n_cos = int((euc_groups == g).sum()), int((cos_groups == g).sum())
+        owner = "Euclid" if n_euc > n_cos else "COSMOS"
+        axes3[g, 0].set_ylabel(f"blob {g} ({owner})\n{sizes[g]} {args.group_survey}",
+                               fontsize=13, fontweight="bold")
+    fig3.suptitle(f"encoder_1 blobs — {args.per_group} most central "
+                  f"{args.group_survey} galaxies in each", fontsize=15)
+    plt.tight_layout(rect=[0, 0, 1, 0.96])
+    plt.savefig(grid_path, dpi=150, bbox_inches="tight")
+    plt.close()
+    print(f"Saved group cutouts: {grid_path}")
 
 
 if __name__ == "__main__":
