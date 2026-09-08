@@ -107,6 +107,52 @@ def _renumber_left_to_right(labels, coords):
     return np.array([remap[int(g)] if g >= 0 else -1 for g in labels])
 
 
+def _find_blobs(reducer, emb, N, n_fallback, seed, name):
+    """Blob label per point for one encoder's UMAP: graph first, then KMeans.
+
+    Returns (groups, n_groups). `groups` covers all 2N points — rows [0, N) are
+    the Euclid views, rows [N, 2N) the COSMOS views of those same galaxies.
+    """
+    print(f"Finding {name} regions from UMAP's own manifold graph...")
+    groups = _regions_from_graph(reducer)
+    if groups is None:
+        print(f"  graph gives no separation; falling back to "
+              f"KMeans k={n_fallback} on the 2-D coordinates")
+        groups = _assign_groups(emb, n_fallback, seed)
+    groups = _renumber_left_to_right(groups, emb)
+    n_groups = int(groups.max()) + 1
+
+    print(f"{name} UMAP split into {n_groups} blobs "
+          f"(numbered left-to-right by UMAP 1):")
+    for g in range(n_groups):
+        n_euc = int((groups[:N] == g).sum())
+        n_cos = int((groups[N:] == g).sum())
+        owner = "Euclid" if n_euc > n_cos else "COSMOS"
+        print(f"  blob {g}: {n_euc:5d} Euclid + {n_cos:5d} COSMOS -> {owner}-dominated")
+    return groups, n_groups
+
+
+def _write_group_csv(path, indices, groups, N, pts):
+    """Write the per-galaxy blob assignment for one encoder.
+
+    Both survey columns go in so crossovers are findable: a galaxy whose two
+    views landed in different blobs has euclid_group != cosmos_group, and
+    same_blob==1 means this encoder placed them together. A group of -1 means the
+    point sat in a tiny off-manifold component, and two -1s do not count as
+    "same" — they are unplaced, not together.
+    """
+    euc, cos = groups[:N], groups[N:]
+    with open(path, "w") as fh:
+        fh.write("dataset_idx,euclid_group,cosmos_group,same_blob,umap_1,umap_2\n")
+        for i in range(N):
+            same = int(euc[i] >= 0 and euc[i] == cos[i])
+            fh.write(f"{indices[i]},{euc[i]},{cos[i]},{same},"
+                     f"{pts[i, 0]:.6f},{pts[i, 1]:.6f}\n")
+    n_together = int(((euc == cos) & (euc >= 0)).sum())
+    print(f"Saved group assignment: {path}  ({N} galaxies, "
+          f"{n_together} with both views in the same blob)")
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--checkpoint",  required=True)
@@ -206,26 +252,17 @@ def main():
 
     print("Computing UMAP for encoder_2 (same-instrument)...")
     all_emb2  = np.concatenate([euclid_emb2, cosmos_emb2], axis=0)
-    umap_emb2 = umap.UMAP(**umap_params).fit_transform(all_emb2)
+    reducer2  = umap.UMAP(**umap_params)   # kept: reducer2.graph_ defines the regions
+    umap_emb2 = reducer2.fit_transform(all_emb2)
     euc_u2, cos_u2 = umap_emb2[:N], umap_emb2[N:]
 
-    # --- Find the encoder_1 blobs (needed for the main plot's labels) ---
-    print("Finding regions from UMAP's own manifold graph...")
-    all_groups = _regions_from_graph(reducer1)
-    if all_groups is None:
-        print(f"  graph gives no separation; falling back to "
-              f"KMeans k={args.n_groups} on the 2-D coordinates")
-        all_groups = _assign_groups(umap_emb1, args.n_groups, args.seed)
-    all_groups = _renumber_left_to_right(all_groups, umap_emb1)
-    n_groups = int(all_groups.max()) + 1
-    euc_groups, cos_groups = all_groups[:N], all_groups[N:]
-
-    print(f"encoder_1 UMAP split into {n_groups} blobs "
-          f"(numbered left-to-right by UMAP 1):")
-    for g in range(n_groups):
-        n_euc, n_cos = int((euc_groups == g).sum()), int((cos_groups == g).sum())
-        owner = "Euclid" if n_euc > n_cos else "COSMOS"
-        print(f"  blob {g}: {n_euc:5d} Euclid + {n_cos:5d} COSMOS -> {owner}-dominated")
+    # --- Find each encoder's blobs (also used to label the main plot) ---
+    # The two encoders are grouped independently: each has its own embedding, so
+    # blob 1 of encoder_1 has nothing to do with blob 1 of encoder_2.
+    groups1, n_groups1 = _find_blobs(reducer1, umap_emb1, N, args.n_groups,
+                                     args.seed, "encoder_1")
+    groups2, n_groups2 = _find_blobs(reducer2, umap_emb2, N, args.n_groups,
+                                     args.seed, "encoder_2")
 
     # --- Pick random pairs to highlight ---
     rng = np.random.default_rng(args.seed)
@@ -256,8 +293,8 @@ def main():
         Line2D([0], [0], marker="*", color="w", markerfacecolor="gray", markersize=12,
                markeredgecolor="black", label=f"{len(pair_ids)} highlighted pairs"),
     ]
-    # Blob labels, only on encoder_1 — the blobs were found in this embedding, so
-    # the same numbers would be meaningless over encoder_2's different layout.
+    # Blob labels. Each encoder is grouped in its own embedding, so ax1 gets
+    # encoder_1's numbers and ax2 encoder_2's — they are unrelated numberings.
     # Placed just above each blob's top edge (median x, max y) rather than at the
     # centroid, so they sit beside the points instead of on top of them.
     # Hand-placed positions in data coordinates, for blobs whose automatic label
@@ -266,8 +303,8 @@ def main():
     # different seed). Blobs not listed fall back to the automatic placement.
     blob_label_pos = {0: (-6.5, 12.0)}
 
-    for g in range(n_groups):
-        blob = umap_emb1[all_groups == g]
+    for g in range(n_groups1):
+        blob = umap_emb1[groups1 == g]
         if g in blob_label_pos:
             xy, offset = blob_label_pos[g], (0, 0)
         else:
@@ -296,6 +333,13 @@ def main():
                      (cos_u2[pid, 0], cos_u2[pid, 1])]:
             ax2.annotate(label, xy=(x, y), xytext=(4, 4), textcoords="offset points",
                          fontsize=10, color=color, fontweight="bold")
+
+    for g in range(n_groups2):
+        blob = umap_emb2[groups2 == g]
+        ax2.annotate(str(g), xy=(np.median(blob[:, 0]), blob[:, 1].max()),
+                     xytext=(0, 8), textcoords="offset points",
+                     ha="center", va="bottom",
+                     fontsize=15, color="black", zorder=7)
 
     ax2.set_title("encoder_2 — same instrument", fontsize=18)
     ax2.set_xlabel("UMAP 1", fontsize=15)
@@ -356,27 +400,22 @@ def main():
         # into — which is how a COSMOS galaxy can sit inside Euclid's blob.
         #
         # euc_u1 and cos_u1 share row order, so row i of either is galaxy indices[i]
+        n_groups = n_groups1
+        euc_groups, cos_groups = groups1[:N], groups1[N:]
         groups = cos_groups if args.group_survey == "cosmos" else euc_groups
         pts = cos_u1 if args.group_survey == "cosmos" else euc_u1
         sizes = [int((groups == g).sum()) for g in range(n_groups)]
 
-        # Per-galaxy table. Both columns are given so you can find the crossovers:
-        # a galaxy whose two views landed in different blobs has euclid_group !=
-        # cosmos_group, and same_blob==1 means the model put them together.
-        # A group of -1 means the point sat in a tiny off-manifold component.
-        with open(args.out_groups, "w") as fh:
-            fh.write("dataset_idx,euclid_group,cosmos_group,same_blob,umap_1,umap_2\n")
-            for i in range(N):
-                # two unassigned points (both -1) are not "in the same blob"
-                same = int(euc_groups[i] >= 0 and euc_groups[i] == cos_groups[i])
-                fh.write(f"{indices[i]},{euc_groups[i]},{cos_groups[i]},{same},"
-                         f"{pts[i, 0]:.6f},{pts[i, 1]:.6f}\n")
-        n_together = int(((euc_groups == cos_groups) & (euc_groups >= 0)).sum())
-        print(f"Saved group assignment: {args.out_groups}  ({N} galaxies, "
-              f"{n_together} with both views in the same blob)")
+        stem, ext = os.path.splitext(args.out_groups)
 
-        # cutouts of the most central galaxies in each group, to see what is inside
-        stem = os.path.splitext(args.out_groups)[0]
+        # One table per encoder. The blob numbers are per-encoder and unrelated
+        # between the two files, so they are kept separate rather than joined.
+        _write_group_csv(args.out_groups, indices, groups1, N, pts)
+        _write_group_csv(f"{stem}_encoder2{ext}", indices, groups2, N,
+                         cos_u2 if args.group_survey == "cosmos" else euc_u2)
+
+        # cutouts of the most central galaxies in each encoder_1 group
+
         grid_path = f"{stem}_cutouts.png"
         fig3, axes3 = plt.subplots(n_groups, args.per_group,
                                    figsize=(2.4 * args.per_group, 2.7 * n_groups),
