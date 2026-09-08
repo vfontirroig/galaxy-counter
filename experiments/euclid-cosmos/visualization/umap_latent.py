@@ -38,13 +38,19 @@ from dataset import EuclidCosmosDataset
 from train import EuclidCosmosModel, collate_fn
 
 
+# Blobs expected in each encoder's UMAP: the Euclid blob plus the two COSMOS
+# blobs. Both encoders show this same structure, so it is fixed here rather than
+# exposed as a flag.
+N_BLOBS = 3
+
+
 def _percentile_scale(arr):
     """Clip and rescale a 2-D float array to [0, 1] for display."""
     lo, hi = np.percentile(arr, 1), np.percentile(arr, 99)
     return np.clip((arr - lo) / (hi - lo + 1e-8), 0, 1)
 
 
-def _regions_from_graph(reducer, min_size=25):
+def _regions_from_graph(reducer, min_blobs=2, min_size=25):
     """Region label per point, taken from UMAP's own manifold graph.
 
     reducer.graph_ is the fuzzy simplicial set UMAP actually embedded. Two points
@@ -55,8 +61,12 @@ def _regions_from_graph(reducer, min_size=25):
     UMAP itself returns no cluster labels (fit_transform gives coordinates only),
     so this is the closest thing to a native answer. It only helps when the graph
     is in fact disconnected, which depends on n_neighbors: more neighbours glue
-    components together. Returns None when it cannot separate anything, so the
-    caller can fall back to KMeans.
+    components together.
+
+    Returns None unless it finds at least `min_blobs` regions, so the caller can
+    fall back to KMeans. That floor matters because the graph tends to UNDER-
+    segment: two visually separate blobs joined by a thin trail of points are one
+    component, and accepting that would silently merge them.
 
     Components smaller than min_size are treated as stragglers and merged into
     label -1 rather than becoming their own "blob".
@@ -65,12 +75,13 @@ def _regions_from_graph(reducer, min_size=25):
 
     n_comp, raw = connected_components(reducer.graph_, directed=False)
     print(f"  UMAP graph has {n_comp} connected component(s)")
-    if n_comp < 2:
+    if n_comp < min_blobs:
         return None
 
     keep = [c for c in range(n_comp) if (raw == c).sum() >= min_size]
-    if len(keep) < 2:
-        print(f"  only {len(keep)} component(s) above min_size={min_size}")
+    if len(keep) < min_blobs:
+        print(f"  only {len(keep)} component(s) above min_size={min_size}, "
+              f"need {min_blobs}")
         return None
 
     labels = np.full(len(raw), -1, dtype=int)
@@ -107,18 +118,20 @@ def _renumber_left_to_right(labels, coords):
     return np.array([remap[int(g)] if g >= 0 else -1 for g in labels])
 
 
-def _find_blobs(reducer, emb, N, n_fallback, seed, name):
+def _find_blobs(reducer, emb, N, seed, name):
     """Blob label per point for one encoder's UMAP: graph first, then KMeans.
+
+    Both encoders are treated identically and expected to hold N_BLOBS regions.
 
     Returns (groups, n_groups). `groups` covers all 2N points — rows [0, N) are
     the Euclid views, rows [N, 2N) the COSMOS views of those same galaxies.
     """
     print(f"Finding {name} regions from UMAP's own manifold graph...")
-    groups = _regions_from_graph(reducer)
+    groups = _regions_from_graph(reducer, min_blobs=N_BLOBS)
     if groups is None:
-        print(f"  graph gives no separation; falling back to "
-              f"KMeans k={n_fallback} on the 2-D coordinates")
-        groups = _assign_groups(emb, n_fallback, seed)
+        print(f"  graph found fewer than {N_BLOBS} regions; falling back to "
+              f"KMeans k={N_BLOBS} on the 2-D coordinates")
+        groups = _assign_groups(emb, N_BLOBS, seed)
     groups = _renumber_left_to_right(groups, emb)
     n_groups = int(groups.max()) + 1
 
@@ -176,11 +189,6 @@ def main():
                         "(default: cosmos). The blobs themselves are always found "
                         "using BOTH surveys' points, so a COSMOS galaxy sitting "
                         "inside Euclid's blob is labelled as being in that blob.")
-    p.add_argument("--n-groups",  type=int, default=3,
-                   help="FALLBACK ONLY. Blobs normally come from the connected "
-                        "components of UMAP's own graph, which needs no count. This "
-                        "k is used only if that graph turns out fully connected "
-                        "(default: 3 — the Euclid blob plus the two COSMOS blobs)")
     p.add_argument("--per-group", type=int, default=8,
                    help="Cutouts to show per group, most central first (default: 8)")
     p.add_argument("--batch-size",  type=int, default=256)
@@ -259,10 +267,8 @@ def main():
     # --- Find each encoder's blobs (also used to label the main plot) ---
     # The two encoders are grouped independently: each has its own embedding, so
     # blob 1 of encoder_1 has nothing to do with blob 1 of encoder_2.
-    groups1, n_groups1 = _find_blobs(reducer1, umap_emb1, N, args.n_groups,
-                                     args.seed, "encoder_1")
-    groups2, n_groups2 = _find_blobs(reducer2, umap_emb2, N, args.n_groups,
-                                     args.seed, "encoder_2")
+    groups1, n_groups1 = _find_blobs(reducer1, umap_emb1, N, args.seed, "encoder_1")
+    groups2, n_groups2 = _find_blobs(reducer2, umap_emb2, N, args.seed, "encoder_2")
 
     # --- Pick random pairs to highlight ---
     rng = np.random.default_rng(args.seed)
