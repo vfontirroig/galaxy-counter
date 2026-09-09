@@ -42,7 +42,7 @@ COSMOS_DIR_PATH = "/n03data/fontirro/cutouts/cosmos/256_cutouts_rotated/f150w/" 
 EUCLID_HDU = 0   # HDU index for Euclid data (usually 1 for science extension)
 COSMOS_HDU = 0   # HDU index for COSMOS data (usually 0)
 
-OUTPUT_H5 = "/n03data/fontirro/data_files/euclid_cosmos_pairs_vis_f150w_v4.h5"
+OUTPUT_H5 = "/n03data/fontirro/data_files/euclid_cosmos_pairs_vis_f150w_v4_tilesA.h5"
 
 NUM_WORKERS = 16  # parallel threads for loading + preprocessing
 
@@ -132,9 +132,13 @@ def main():
     catalog = catalog[mask].reset_index(drop=True)
     print(f"Pairs with both cutouts present: {len(catalog)}")
 
-    #magnitude cut
-    catalog = catalog[catalog["mag_model_f150w"] < 25].reset_index(drop=True)
-    print(f"Pairs after magnitude cut: {len(catalog)}")
+    # magnitude cut, restricted to the A tiles. na=False so a missing tile is
+    # dropped rather than raising on a NaN in the boolean mask.
+    catalog = catalog[
+        (catalog["mag_model_f150w"] < 25)
+        & (catalog["tile"].str.startswith("A", na=False))
+    ].reset_index(drop=True)
+    print(f"Pairs after magnitude + tile-A cut: {len(catalog)}")
 
     #check if the files exist
     missing_euclid = []
