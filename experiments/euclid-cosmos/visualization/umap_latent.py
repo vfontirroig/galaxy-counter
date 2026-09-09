@@ -303,17 +303,17 @@ def main():
     # crowds the axes or the legend. These are tied to THIS embedding, so clear
     # or revisit them if the UMAP layout changes (new checkpoint, rebuilt HDF5,
     # different seed). Blobs not listed fall back to the automatic placement.
-    blob_label_pos = {0: (-6.5, 12.0)}
+    # blob_label_pos = {0: (-6.5, 12.0)}
 
-    for g in range(n_groups1):
-        blob = umap_emb1[groups1 == g]
-        if g in blob_label_pos:
-            xy, offset = blob_label_pos[g], (0, 0)
-        else:
-            xy, offset = (np.median(blob[:, 0]), blob[:, 1].max()), (0, 8)
-        ax1.annotate(str(g), xy=xy, xytext=offset, textcoords="offset points",
-                     ha="center", va="bottom",
-                     fontsize=15, color="black", zorder=7)
+    # for g in range(n_groups1):
+    #     blob = umap_emb1[groups1 == g]
+    #     if g in blob_label_pos:
+    #         xy, offset = blob_label_pos[g], (0, 0)
+    #     else:
+    #         xy, offset = (np.median(blob[:, 0]), blob[:, 1].max()), (0, 8)
+    #     ax1.annotate(str(g), xy=xy, xytext=offset, textcoords="offset points",
+    #                  ha="center", va="bottom",
+    #                  fontsize=15, color="black", zorder=7)
 
     ax1.legend(handles=legend_handles, fontsize=12)
     ax1.set_title("encoder_1 — same galaxy (physics)", fontsize=18)
@@ -336,12 +336,12 @@ def main():
             ax2.annotate(label, xy=(x, y), xytext=(4, 4), textcoords="offset points",
                          fontsize=10, color=color, fontweight="bold")
 
-    for g in range(n_groups2):
-        blob = umap_emb2[groups2 == g]
-        ax2.annotate(str(g), xy=(np.median(blob[:, 0]), blob[:, 1].max()),
-                     xytext=(0, 8), textcoords="offset points",
-                     ha="center", va="bottom",
-                     fontsize=15, color="black", zorder=7)
+    # for g in range(n_groups2):
+    #     blob = umap_emb2[groups2 == g]
+    #     ax2.annotate(str(g), xy=(np.median(blob[:, 0]), blob[:, 1].max()),
+    #                  xytext=(0, 8), textcoords="offset points",
+    #                  ha="center", va="bottom",
+    #                  fontsize=15, color="black", zorder=7)
 
     ax2.set_title("encoder_2 — same instrument", fontsize=18)
     ax2.set_xlabel("UMAP 1", fontsize=15)
