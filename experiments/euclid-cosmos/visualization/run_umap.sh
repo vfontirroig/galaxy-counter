@@ -11,8 +11,8 @@ set -euo pipefail
 
 source /n03data/fontirro/.galaxy-counter-env/bin/activate
 
-CKPT_DIR="/n03data/fontirro/euclid-cosmos/checkpoints/euclid-cosmos-vis-f150w/test-7-phase1/v2"
-PLOT_DIR="/n03data/fontirro/euclid-cosmos/plots_model/euclid-cosmos-vis-f150w/test-7-phase1/v2"
+CKPT_DIR="/n03data/fontirro/euclid-cosmos/checkpoints/euclid-cosmos-vis-f150w/test-7-phase1/v1"
+PLOT_DIR="/n03data/fontirro/euclid-cosmos/plots_model/euclid-cosmos-vis-f150w/test-7-phase1/v1"
 
 python /n03data/fontirro/euclid-cosmos/galaxy-counter/experiments/euclid-cosmos/visualization/umap_latent.py \
     --checkpoint "${CKPT_DIR}/best-epoch=79-step=97000.ckpt" \
