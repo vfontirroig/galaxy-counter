@@ -27,6 +27,7 @@ Usage:
 """
 
 import os
+from statistics import mean
 os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
 os.environ.setdefault("OMP_NUM_THREADS", "1")
 
@@ -37,12 +38,11 @@ from torch.utils.data import Dataset
 
 # Per-survey [mean, std] of preprocessed pixel values.
 NORM_DICT = {
-    "euclid": [0.00283, 0.01285],
-    "euclid_up": [0.00283, 0.01271],
-    "cosmos": [0.05086, 0.14982],
-    "cosmos_ds": [0.05086, 0.14092],
+    "euclid": [0.02643, 0.06358],
+    "euclid_up": [0.02642, 0.06224],
+    "cosmos": [0.03195, 0.14115],
+    "cosmos_ds": [0.03194, 0.12683],
 }
-
 
 class EuclidCosmosDataset(Dataset):
     """
