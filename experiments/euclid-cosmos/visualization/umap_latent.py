@@ -307,23 +307,15 @@ def main():
     ]
     # Blob labels. Each encoder is grouped in its own embedding, so ax1 gets
     # encoder_1's numbers and ax2 encoder_2's — they are unrelated numberings.
-    # Placed just above each blob's top edge (median x, max y) rather than at the
-    # centroid, so they sit beside the points instead of on top of them.
-    # Hand-placed positions in data coordinates, for blobs whose automatic label
-    # crowds the axes or the legend. These are tied to THIS embedding, so clear
-    # or revisit them if the UMAP layout changes (new checkpoint, rebuilt HDF5,
-    # different seed). Blobs not listed fall back to the automatic placement.
-    # blob_label_pos = {0: (-6.5, 12.0)}
-
-    # for g in range(n_groups1):
-    #     blob = umap_emb1[groups1 == g]
-    #     if g in blob_label_pos:
-    #         xy, offset = blob_label_pos[g], (0, 0)
-    #     else:
-    #         xy, offset = (np.median(blob[:, 0]), blob[:, 1].max()), (0, 8)
-    #     ax1.annotate(str(g), xy=xy, xytext=offset, textcoords="offset points",
-    #                  ha="center", va="bottom",
-    #                  fontsize=15, color="black", zorder=7)
+    # Positions are derived from the points (median x, top edge) rather than
+    # hardcoded, so they follow the layout when the embedding changes — a new
+    # checkpoint, a rebuilt HDF5 or a different seed all move the blobs.
+    for g in range(n_groups1):
+        blob = umap_emb1[groups1 == g]
+        ax1.annotate(str(g), xy=(np.median(blob[:, 0]), blob[:, 1].max()),
+                     xytext=(0, 8), textcoords="offset points",
+                     ha="center", va="bottom",
+                     fontsize=15, color="black", zorder=7)
 
     ax1.legend(handles=legend_handles, fontsize=12)
     ax1.set_title("encoder_1 — same galaxy (physics)", fontsize=18)
@@ -346,12 +338,12 @@ def main():
             ax2.annotate(label, xy=(x, y), xytext=(4, 4), textcoords="offset points",
                          fontsize=10, color=color, fontweight="bold")
 
-    # for g in range(n_groups2):
-    #     blob = umap_emb2[groups2 == g]
-    #     ax2.annotate(str(g), xy=(np.median(blob[:, 0]), blob[:, 1].max()),
-    #                  xytext=(0, 8), textcoords="offset points",
-    #                  ha="center", va="bottom",
-    #                  fontsize=15, color="black", zorder=7)
+    for g in range(n_groups2):
+        blob = umap_emb2[groups2 == g]
+        ax2.annotate(str(g), xy=(np.median(blob[:, 0]), blob[:, 1].max()),
+                     xytext=(0, 8), textcoords="offset points",
+                     ha="center", va="bottom",
+                     fontsize=15, color="black", zorder=7)
 
     ax2.set_title("encoder_2 — same instrument", fontsize=18)
     ax2.set_xlabel("UMAP 1", fontsize=15)
