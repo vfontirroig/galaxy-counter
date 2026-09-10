@@ -36,7 +36,7 @@ for the existing pattern.
 # CONFIG — edit these before running
 # ---------------------------------------------------------------------------
 
-H5_PATH = "/n03data/fontirro/data_files/euclid_cosmos_pairs_vis_f150w_v4.h5"
+H5_PATH = "/n03data/fontirro/data_files/euclid_cosmos_pairs_vis_f150w_v4_tilesA.h5"
 
 # image dataset name -> output neighbor dataset suffix
 SURVEY_IMAGE_KEYS = {
