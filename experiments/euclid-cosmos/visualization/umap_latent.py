@@ -145,7 +145,7 @@ def _find_blobs(reducer, emb, N, seed, name):
     return groups, n_groups
 
 
-def _write_group_csv(path, indices, groups, N, pts):
+def _write_group_csv(path, indices, groups, N, pts, euc_pts, cos_pts):
     """Write the per-galaxy blob assignment for one encoder.
 
     Both survey columns go in so crossovers are findable: a galaxy whose two
@@ -153,14 +153,24 @@ def _write_group_csv(path, indices, groups, N, pts):
     same_blob==1 means this encoder placed them together. A group of -1 means the
     point sat in a tiny off-manifold component, and two -1s do not count as
     "same" — they are unplaced, not together.
+
+    Both surveys' coordinates are written too. umap_1/umap_2 stay as the
+    --group-survey half (unchanged, so existing readers keep working), and
+    euclid_umap_* / cosmos_umap_* give each view's own position in the shared
+    embedding. Without the Euclid pair the file cannot show the Euclid blob at
+    all -- only the COSMOS points that fell into it.
     """
     euc, cos = groups[:N], groups[N:]
     with open(path, "w") as fh:
-        fh.write("dataset_idx,euclid_group,cosmos_group,same_blob,umap_1,umap_2\n")
+        fh.write("dataset_idx,euclid_group,cosmos_group,same_blob,"
+                 "umap_1,umap_2,"
+                 "euclid_umap_1,euclid_umap_2,cosmos_umap_1,cosmos_umap_2\n")
         for i in range(N):
             same = int(euc[i] >= 0 and euc[i] == cos[i])
             fh.write(f"{indices[i]},{euc[i]},{cos[i]},{same},"
-                     f"{pts[i, 0]:.6f},{pts[i, 1]:.6f}\n")
+                     f"{pts[i, 0]:.6f},{pts[i, 1]:.6f},"
+                     f"{euc_pts[i, 0]:.6f},{euc_pts[i, 1]:.6f},"
+                     f"{cos_pts[i, 0]:.6f},{cos_pts[i, 1]:.6f}\n")
     n_together = int(((euc == cos) & (euc >= 0)).sum())
     print(f"Saved group assignment: {path}  ({N} galaxies, "
           f"{n_together} with both views in the same blob)")
@@ -414,10 +424,11 @@ def main():
     # between the two files, so they are kept separate rather than joined —
     # join them on dataset_idx to compare.
     _write_group_csv(os.path.join(out_dir, "umap_groups_encoder_1.csv"),
-                     indices, groups1, N, pts)
+                     indices, groups1, N, pts, euc_u1, cos_u1)
     _write_group_csv(os.path.join(out_dir, "umap_groups_encoder_2.csv"),
                      indices, groups2, N,
-                     cos_u2 if args.group_survey == "cosmos" else euc_u2)
+                     cos_u2 if args.group_survey == "cosmos" else euc_u2,
+                     euc_u2, cos_u2)
 
     # cutouts of the most central galaxies in each encoder_1 blob
     grid_path = os.path.join(out_dir, "umap_groups_encoder_1_cutouts.png")
