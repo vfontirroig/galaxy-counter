@@ -310,12 +310,12 @@ def main():
     # Positions are derived from the points (median x, top edge) rather than
     # hardcoded, so they follow the layout when the embedding changes — a new
     # checkpoint, a rebuilt HDF5 or a different seed all move the blobs.
-    for g in range(n_groups1):
-        blob = umap_emb1[groups1 == g]
-        ax1.annotate(str(g), xy=(np.median(blob[:, 0]), blob[:, 1].max()),
-                     xytext=(0, 8), textcoords="offset points",
-                     ha="center", va="bottom",
-                     fontsize=15, color="black", zorder=7)
+    # for g in range(n_groups1):
+    #     blob = umap_emb1[groups1 == g]
+    #     ax1.annotate(str(g), xy=(np.median(blob[:, 0]), blob[:, 1].max()),
+    #                  xytext=(0, 8), textcoords="offset points",
+    #                  ha="center", va="bottom",
+    #                  fontsize=15, color="black", zorder=7)
 
     ax1.legend(handles=legend_handles, fontsize=12)
     ax1.set_title("encoder_1 — same galaxy (physics)", fontsize=18)
@@ -338,12 +338,12 @@ def main():
             ax2.annotate(label, xy=(x, y), xytext=(4, 4), textcoords="offset points",
                          fontsize=10, color=color, fontweight="bold")
 
-    for g in range(n_groups2):
-        blob = umap_emb2[groups2 == g]
-        ax2.annotate(str(g), xy=(np.median(blob[:, 0]), blob[:, 1].max()),
-                     xytext=(0, 8), textcoords="offset points",
-                     ha="center", va="bottom",
-                     fontsize=15, color="black", zorder=7)
+    # for g in range(n_groups2):
+    #     blob = umap_emb2[groups2 == g]
+    #     ax2.annotate(str(g), xy=(np.median(blob[:, 0]), blob[:, 1].max()),
+    #                  xytext=(0, 8), textcoords="offset points",
+    #                  ha="center", va="bottom",
+    #                  fontsize=15, color="black", zorder=7)
 
     ax2.set_title("encoder_2 — same instrument", fontsize=18)
     ax2.set_xlabel("UMAP 1", fontsize=15)
