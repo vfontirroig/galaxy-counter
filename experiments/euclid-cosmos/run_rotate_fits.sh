@@ -11,4 +11,4 @@ set -euo pipefail
 # Activate the virtual environment
 # source /n03data/fontirro/.galaxy-counter-env/bin/activate
 
-python /n03data/fontirro/galaxy-counter/experiments/euclid-cosmos/rotate_fits.py
+python /n03data/fontirro/euclid-cosmos/galaxy-counter/experiments/euclid-cosmos/rotate_fits.py
