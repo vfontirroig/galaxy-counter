@@ -8,6 +8,7 @@
 #SBATCH --time=04:00:00
 set -euo pipefail
 
-source /n03data/fontirro/.galaxy-counter-env/bin/activate
+# Activate the virtual environment
+# source /n03data/fontirro/.galaxy-counter-env/bin/activate
 
 python /n03data/fontirro/galaxy-counter/experiments/euclid-cosmos/rotate_fits.py
