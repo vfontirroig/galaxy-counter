@@ -135,7 +135,7 @@ def compute_norm_stats(hdf5_path: str, n_samples: int = 10_000) -> dict:
 def main():
     from torch.utils.data import DataLoader
 
-    H5_PATH = "/n03data/fontirro/data_files/euclid_cosmos_pairs_vis_f150w_v4_tilesB.h5"
+    H5_PATH = "/n03data/fontirro/data_files/euclid_cosmos_pairs_vis_f150w_v5.h5"
 
     print("Computing normalization stats...")
     stats = compute_norm_stats(H5_PATH)
@@ -147,14 +147,14 @@ def main():
     print(f"stats: {stats}")
 
     #for only one galaxy sample, we can do:
-    anchor, input, meta = dataset[0]
-    print(f"  Anchor: {anchor}")
-    print(f"  Anchor shape: {anchor.shape}")
-    print(f"  Input: {input}")
-    print(f"  Input shape: {input.shape}")
-    print(f"  Metadata: {meta}")
-    #print(f"  Sample idx: {meta['idx']}, anchor survey: {meta['anchor_survey']}")
-    print(f"  Dataset: {dataset[0]}")
+    # anchor, input, meta = dataset[0]
+    # print(f"  Anchor: {anchor}")
+    # print(f"  Anchor shape: {anchor.shape}")
+    # print(f"  Input: {input}")
+    # print(f"  Input shape: {input.shape}")
+    # print(f"  Metadata: {meta}")
+    # #print(f"  Sample idx: {meta['idx']}, anchor survey: {meta['anchor_survey']}")
+    # print(f"  Dataset: {dataset[0]}")
     
     
     # print(f"  Euclid shape: {input.shape}, range [{input.min():.3f}, {input.max():.3f}]")
