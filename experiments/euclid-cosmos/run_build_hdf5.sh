@@ -8,6 +8,10 @@
 #SBATCH --time=04:00:00
 set -euo pipefail
 
-#source /n03data/fontirro/.galaxy-counter-env/bin/activate
-
-python /n03data/fontirro/euclid-cosmos/galaxy-counter/experiments/euclid-cosmos/build_hdf5.py
+# Don't `source .../activate` — the venv's activate script bakes in the
+# automounter-canonicalized `/automnt/n03data/...` prefix, which is
+# unreachable from compute nodes and silently falls through PATH to the
+# system platform-python instead. Call the venv's python3 directly via the
+# working /n03data/... path so it resolves the venv's own site-packages.
+/n03data/fontirro/.galaxy-counter-env/bin/python3 \
+    /n03data/fontirro/euclid-cosmos/galaxy-counter/experiments/euclid-cosmos/build_hdf5.py
