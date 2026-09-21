@@ -3,9 +3,9 @@
 #SBATCH --output=/n03data/fontirro/euclid-cosmos/logs/build_hdf5_%j.out
 #SBATCH --error=/n03data/fontirro/euclid-cosmos/logs/build_hdf5_%j.err
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=16        # set NUM_WORKERS in build_hdf5.py to match this
+#SBATCH --cpus-per-task=24        # set NUM_WORKERS in build_hdf5.py to match this
 #SBATCH --mem=32G
-#SBATCH --time=04:00:00
+#SBATCH --time=06:00:00
 set -euo pipefail
 
 # Don't `source .../activate` — the venv's activate script bakes in the

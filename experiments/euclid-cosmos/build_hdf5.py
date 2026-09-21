@@ -44,7 +44,7 @@ COSMOS_HDU = 0   # HDU index for COSMOS data (usually 0)
 
 OUTPUT_H5 = "/n03data/fontirro/data_files/euclid_cosmos_pairs_nir_h_f150w_v1.h5"
 
-NUM_WORKERS = 16  # parallel threads for loading + preprocessing
+NUM_WORKERS = 24  # parallel threads for loading + preprocessing
 
 H_SIZE = 64  # target spatial size for both Euclid and COSMOS
 W_SIZE = 64  # target spatial size for both Euclid and COSMOS
