@@ -48,14 +48,17 @@ COSMOS_ZP = {
 
 
 # Euclid AB zeropoints per filter — obtained from Euclid's fits file header.
-# VIS and H are read off real MER cutout headers (MAGZERO keyword); Y and J are
-# NOT — they are placeholders and will be ~5.5 mag wrong if NISP behaves like H,
-# which scales the pixels by ~158x. Read MAGZERO before using them.
+# Keys are the header's own FILTER values ('VIS', 'NIR_H', ...), so the band you
+# pass to preprocess_image_v2 is the string you read out of the cutout rather
+# than a second naming scheme to keep in sync.
+# VIS and NIR_H are read off real MER cutout headers (MAGZERO keyword); NIR_Y and
+# NIR_J are NOT — they are placeholders and will be ~5.5 mag wrong if they behave
+# like NIR_H, which scales the pixels by ~158x. Read MAGZERO before using them.
 EUCLID_ZP = {
-    "VIS": 24.5,   # verified: DR1_R1 VIS tile, BUNIT 'ADU/s'
-    "Y":   24.3,   # UNVERIFIED placeholder
-    "J":   24.5,   # UNVERIFIED placeholder
-    "H":   30.0,   # verified: NIR_H cutout header, BUNIT 'ELECTRON/s'
+    "VIS":   24.5,   # verified: DR1_R1 VIS tile, BUNIT 'ADU/s'
+    "NIR_Y": 24.3,   # UNVERIFIED placeholder
+    "NIR_J": 24.5,   # UNVERIFIED placeholder
+    "NIR_H": 30.0,   # verified: NIR_H cutout header, BUNIT 'ELECTRON/s'
 }
 
 
