@@ -108,7 +108,11 @@ def process_pair(args: tuple) -> tuple:
     try:
         euc_tensor = load_fits(ep, EUCLID_HDU)
         cos_tensor = load_fits(cp, COSMOS_HDU)
-        euc = preprocess_image_v2(euc_tensor, crop_size=EUCLID_CROP_SIZE, bands=["VIS"]).squeeze(0).numpy()
+        # Band must match EUCLID_DIR_PATH: the band name selects the MAGZERO used
+        # to calibrate the pixels, and NIR_H's zeropoint is 5.5 mag from VIS's.
+        # Labelling NIR_H cutouts as "VIS" scales them ~158x too bright, which
+        # arcsinh then compresses into a saturated, contrast-free blob.
+        euc = preprocess_image_v2(euc_tensor, crop_size=EUCLID_CROP_SIZE, bands=["H"]).squeeze(0).numpy()
         cos = preprocess_image_v2(cos_tensor, crop_size=COSMOS_CROP_SIZE, bands=["F150W"]).squeeze(0).numpy()
         cos_down = F.interpolate(
             torch.from_numpy(cos).unsqueeze(0), size=(H_SIZE, W_SIZE),

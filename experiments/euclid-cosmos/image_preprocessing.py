@@ -48,11 +48,14 @@ COSMOS_ZP = {
 
 
 # Euclid AB zeropoints per filter — obtained from Euclid's fits file header.
+# VIS and H are read off real MER cutout headers (MAGZERO keyword); Y and J are
+# NOT — they are placeholders and will be ~5.5 mag wrong if NISP behaves like H,
+# which scales the pixels by ~158x. Read MAGZERO before using them.
 EUCLID_ZP = {
-    "VIS": 24.5,
-    "Y":   24.3,   
-    "J":   24.5,   
-    "H":   24.4,      
+    "VIS": 24.5,   # verified: DR1_R1 VIS tile, BUNIT 'ADU/s'
+    "Y":   24.3,   # UNVERIFIED placeholder
+    "J":   24.5,   # UNVERIFIED placeholder
+    "H":   30.0,   # verified: NIR_H cutout header, BUNIT 'ELECTRON/s'
 }
 
 
@@ -97,9 +100,13 @@ def euclid_count_rate_to_mjy_sr(
 # band -> multiplicative factor onto MJy/sr. COSMOS-Web bands are already there
 # and stay 1.0 for ANY of the released pixel scales (20/30/60 mas), precisely
 # because surface brightness is grid-independent.
-# NOTE: only VIS is verified against a real header (MAGZERO=24.5, DR1_R1). The
-# NISP entries in EUCLID_ZP are unconfirmed — a NIR_Y tile reads MAGZERO=29.8
-# with BUNIT 'ELECTRON/s', so check them before using Y/J/H.
+# NOTE: VIS (MAGZERO=24.5, 'ADU/s') and H (MAGZERO=30.0, 'ELECTRON/s') are
+# verified against real headers; Y and J are still unconfirmed placeholders.
+# EUCLID_PIXEL_SCALE_ARCSEC is applied to every Euclid band — fine while the
+# cutouts come from MER mosaics, which are resampled onto a common 0.1"/px grid
+# for NISP as well as VIS. If you ever feed in NISP data on its native ~0.3"/px
+# grid, this constant has to become a per-band lookup: the factor goes as
+# 1/scale**2, so the wrong scale costs another 9x.
 BAND_TO_MJY_SR = {band: 1.0 for band in COSMOS_ZP}
 BAND_TO_MJY_SR.update(
     {band: euclid_count_rate_to_mjy_sr(zp) for band, zp in EUCLID_ZP.items()}
