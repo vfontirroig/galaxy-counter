@@ -8,6 +8,6 @@
 #SBATCH --time=04:00:00
 set -euo pipefail
 
-source /n03data/fontirro/.galaxy-counter-env/bin/activate
+#source /n03data/fontirro/.galaxy-counter-env/bin/activate
 
 python /n03data/fontirro/euclid-cosmos/galaxy-counter/experiments/euclid-cosmos/build_hdf5.py
