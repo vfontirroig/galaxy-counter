@@ -134,8 +134,10 @@ def main():
 
     # magnitude cut, restricted to the B tiles. na=False so a missing tile is
     # dropped rather than raising on a NaN in the boolean mask.
-    catalog = catalog[(catalog["mag_model_f150w"] < 25) & (catalog["tile"].str.startswith("B", na=False))].reset_index(drop=True)
-    print(f"Pairs after magnitude + tile-B cut: {len(catalog)}")
+    #catalog = catalog[(catalog["mag_model_f150w"] < 25) & (catalog["tile"].str.startswith("B", na=False))].reset_index(drop=True)
+    #print(f"Pairs after magnitude + tile-B cut: {len(catalog)}")
+    catalog = catalog[(catalog["mag_model_f150w"] < 25)].reset_index(drop=True)
+    print(f"Pairs after magnitude cut: {len(catalog)}")
 
     #check if the files exist
     missing_euclid = []
