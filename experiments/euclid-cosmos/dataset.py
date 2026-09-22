@@ -38,8 +38,8 @@ from torch.utils.data import Dataset
 
 # Per-survey [mean, std] of preprocessed pixel values.
 NORM_DICT = {
-    "euclid": [0.33203, 0.38592],
-    "euclid_up": [0.33204, 0.36189],
+    "euclid": [0.06368, 0.09749],
+    "euclid_up": [0.06369, 0.09688],
     "cosmos": [0.03219, 0.14111],
     "cosmos_ds": [0.03220, 0.12683],
 }
