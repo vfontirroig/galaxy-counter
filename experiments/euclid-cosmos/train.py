@@ -1,6 +1,6 @@
 """
 
-Train the flow-matching model on paired Euclid (VIS) x COSMOS (F150W) cutouts.
+Train the flow-matching model on paired Euclid (NIR H) x COSMOS (F150W) cutouts.
 
   - encoder_1 conditions on the COSMOS counterpart of the same galaxy.
   - encoder_2 receives the precomputed same-instrument neighbor of the anchor
@@ -47,7 +47,7 @@ from galaxy_counter.models.double_train_fm_neighbors import ConditionalFlowMatch
 
 class EuclidCosmosModel(ConditionalFlowMatchingModule):
     """
-    Flow-matching model for Euclid VIS → COSMOS F150W and vice versa. 
+    Flow-matching model for Euclid NIR H → COSMOS F150W and vice versa. 
     """
 
     def __init__(self, *args, sample_dir=None, n_val_steps=50,
