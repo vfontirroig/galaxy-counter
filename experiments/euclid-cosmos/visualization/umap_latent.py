@@ -324,7 +324,7 @@ def main():
 
     # --- UMAP plot --- encoder 2
 
-    ax2.scatter(euc_u2[:, 0], euc_u2[:, 1], c="steelblue",  label="Euclid VIS", **kw)
+    ax2.scatter(euc_u2[:, 0], euc_u2[:, 1], c="steelblue",  label="Euclid NIR-H", **kw)
     ax2.scatter(cos_u2[:, 0], cos_u2[:, 1], c="darkorange", label="COSMOS F150W", **kw)
 
     for k, (pid, color) in enumerate(zip(pair_ids, pair_colors)):
@@ -371,7 +371,7 @@ def main():
         if n_pairs == 1:
             axes = axes[:, np.newaxis]
 
-        row_labels = ["Euclid VIS", "COSMOS F150W"]
+        row_labels = ["Euclid NIR-H", "COSMOS F150W"]
         for k, (pid, color) in enumerate(zip(pair_ids, pair_colors)):
             for row, img in enumerate([hl_euclid_imgs[k], hl_cosmos_imgs[k]]):
                 ax = axes[row, k]
