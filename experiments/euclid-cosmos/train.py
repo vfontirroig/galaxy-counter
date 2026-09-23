@@ -244,8 +244,8 @@ class EuclidCosmosModel(ConditionalFlowMatchingModule):
 # ---------------------------------------------------------------------------
 # CONFIG — edit before running
 # ---------------------------------------------------------------------------
-H5_PATH     = "/n03data/fontirro/data_files/euclid_cosmos_pairs_nir_h_f150w_v1.h5"
-CKPT_DIR    = "/n03data/fontirro/euclid-cosmos/checkpoints/euclid-cosmos-nir-h-f150w/test-1-phase1/v1"  # where to save checkpoints and logs
+H5_PATH     = "/n03data/fontirro/data_files/euclid_cosmos_pairs_vis_f150w_v5.h5"
+CKPT_DIR    = "/n03data/fontirro/euclid-cosmos/checkpoints/euclid-cosmos-vis-f150w/test-1-phase1/v6"  # where to save checkpoints and logs
 
 BATCH_SIZE  = 64
 NUM_WORKERS = 16
@@ -425,12 +425,12 @@ def main():
         save_top_k=1,
         filename="latest-step={step}",
     )
-    early_stopping = EarlyStopping(
-        monitor="val/loss",
-        mode="min",
-        patience=20,  # in validation checks, i.e. 20 * val_check_interval = 20_000 steps
-        verbose=True,
-    )
+    # early_stopping = EarlyStopping(
+    #     monitor="val/loss",
+    #     mode="min",
+    #     patience=20,  # in validation checks, i.e. 20 * val_check_interval = 20_000 steps
+    #     verbose=True,
+    # )
 
     trainer = pl.Trainer(
         max_steps=max(1, int(NUM_STEPS / N_GPUS)),
@@ -442,7 +442,7 @@ def main():
         precision="bf16-mixed",
         val_check_interval=1000,
         check_val_every_n_epoch=None,
-        callbacks=[best_checkpoint, periodic_checkpoint, early_stopping],
+        callbacks=[best_checkpoint, periodic_checkpoint],
         num_sanity_val_steps=2,
     )
 
