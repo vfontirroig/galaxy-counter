@@ -285,7 +285,7 @@ def main():
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
 
     kw = dict(s=22, alpha=0.5, rasterized=True)
-    ax1.scatter(euc_u1[:, 0], euc_u1[:, 1], c="steelblue",  label="Euclid VIS", **kw)
+    ax1.scatter(euc_u1[:, 0], euc_u1[:, 1], c="steelblue",  label="Euclid NIR-H", **kw)
     ax1.scatter(cos_u1[:, 0], cos_u1[:, 1], c="darkorange", label="COSMOS F150W", **kw)
 
     for k, (pid, color) in enumerate(zip(pair_ids, pair_colors)):
@@ -300,7 +300,7 @@ def main():
                          fontsize=10, color=color, fontweight="bold")
 
     legend_handles = [
-        Line2D([0], [0], marker="o", color="w", markerfacecolor="steelblue",  markersize=10, label="Euclid VIS"),
+        Line2D([0], [0], marker="o", color="w", markerfacecolor="steelblue",  markersize=10, label="Euclid NIR-H"),
         Line2D([0], [0], marker="o", color="w", markerfacecolor="darkorange", markersize=10, label="COSMOS F150W"),
         Line2D([0], [0], marker="*", color="w", markerfacecolor="gray", markersize=12,
                markeredgecolor="black", label=f"{len(pair_ids)} highlighted pairs"),
