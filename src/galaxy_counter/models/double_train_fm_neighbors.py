@@ -50,7 +50,7 @@ class ResNetEncoder(nn.Module):
                 bias=old_conv.bias is not None,
             )
 
-        self.proj = nn.Conv2d(512, cross_attention_dim, kernel_size=1)
+        self.proj = nn.Conv2d(512, cross_attention_dim, kernel_size=1) #embedding space 
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """

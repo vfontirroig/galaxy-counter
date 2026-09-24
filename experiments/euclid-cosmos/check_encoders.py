@@ -1,12 +1,19 @@
 """
 Sanity check for encoder_1 and encoder_2 of the trained model.
 
+There are two latent spaces, one per encoder, and BOTH surveys are embedded into
+each of them — encoder_1(Euclid) and encoder_1(COSMOS) are two populations of
+points in one space, not two spaces. The report is organised that way: each space
+is described once with the surveys pooled, then the per-survey split is reported
+as structure inside it.
+
 Checks:
   1. Output shapes are correct
   2. No NaN / Inf values
   3. Embeddings vary across samples (not collapsed to a constant)
-  4. encoder_1 and encoder_2 produce different embeddings (different weights)
-  5. encoder_1: COSMOS and Euclid embeddings of the SAME galaxy are more
+  4. Where the two surveys sit within each space (centroid separation vs spread)
+  5. encoder_1 and encoder_2 produce different embeddings (different weights)
+  6. encoder_1: COSMOS and Euclid embeddings of the SAME galaxy are more
      similar to each other than to random other galaxies (alignment check)
 
 Usage:
@@ -56,6 +63,24 @@ def report(name, emb):
         print(f"    ✅  OK")
 
 
+def survey_overlap(name, euc, cos):
+    """How far apart the two surveys sit inside ONE encoder's latent space.
+
+    Both arguments are the same encoder applied to different inputs, so they are
+    two populations in a single space. The ratio compares the distance between
+    their centroids to the typical spread within a survey: << 1 means the two
+    clouds sit on top of each other (survey-invariant), >> 1 means they occupy
+    separate regions.
+    """
+    d_centroid = (euc.mean(0) - cos.mean(0)).norm().item()
+    spread = 0.5 * (euc.std(0).norm().item() + cos.std(0).norm().item())
+    print(f"  {name}")
+    print(f"    Euclid  mean {euc.mean():+.5f}  std {euc.std():.5f}")
+    print(f"    COSMOS  mean {cos.mean():+.5f}  std {cos.std():.5f}")
+    print(f"    centroid distance {d_centroid:.5f} / within-survey spread "
+          f"{spread:.5f}  ->  ratio {d_centroid / (spread + 1e-8):.3f}")
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--checkpoint", required=True)
@@ -91,18 +116,35 @@ def main():
     euc_emb2  = model.encoder_2(euclid).flatten(1)
     cos_emb2  = model.encoder_2(cosmos).flatten(1)
 
-    # --- 1. Shape / stats / NaN checks ---
-    print("=" * 55)
-    print("1. Embedding statistics")
-    print("=" * 55)
-    report("encoder_1(Euclid)", euc_emb1)
-    report("encoder_1(COSMOS)", cos_emb1)
-    report("encoder_2(Euclid)", euc_emb2)
-    report("encoder_2(COSMOS)", cos_emb2)
+    # There are TWO latent spaces here, not four. Each encoder defines one space
+    # that both surveys are embedded into — encoder_1(Euclid) and
+    # encoder_1(COSMOS) are two populations of points in the SAME space, which is
+    # the whole premise of the alignment check below. So the space is described
+    # once, pooled, and the per-survey split is reported as structure within it.
+    emb1_all = torch.cat([euc_emb1, cos_emb1], dim=0)   # (2N, D)
+    emb2_all = torch.cat([euc_emb2, cos_emb2], dim=0)   # (2N, D)
 
-    # --- 2. encoder_1 ≠ encoder_2 ---
+    # --- 1. Shape / stats / NaN checks, per latent space ---
+    print("=" * 55)
+    print("1. Latent space statistics (both surveys pooled)")
+    print("=" * 55)
+    report("encoder_1 — same-galaxy space", emb1_all)
+    report("encoder_2 — same-instrument space", emb2_all)
+
+    # --- 2. How the two surveys sit inside each space ---
     print("\n" + "=" * 55)
-    print("2. Are encoder_1 and encoder_2 different?")
+    print("2. Survey structure within each space")
+    print("=" * 55)
+    survey_overlap("encoder_1", euc_emb1, cos_emb1)
+    survey_overlap("encoder_2", euc_emb2, cos_emb2)
+    print("  encoder_1 is trained to be survey-invariant, so a LOW ratio is the")
+    print("  goal there; encoder_2 carries instrument identity, so a higher ratio")
+    print("  is expected. A ratio near 0 in BOTH spaces means neither encoder")
+    print("  distinguishes the surveys at all.")
+
+    # --- 3. encoder_1 ≠ encoder_2 ---
+    print("\n" + "=" * 55)
+    print("3. Are encoder_1 and encoder_2 different?")
     print("=" * 55)
     diff = (euc_emb1 - euc_emb2).abs().mean().item()
     print(f"  Mean |encoder_1(Euclid) - encoder_2(Euclid)| = {diff:.5f}")
@@ -111,9 +153,9 @@ def main():
     else:
         print("  ✅  Encoders produce different embeddings")
 
-    # --- 3. encoder_1 alignment: same galaxy should be closer than random ---
+    # --- 4. encoder_1 alignment: same galaxy should be closer than random ---
     print("\n" + "=" * 55)
-    print("3. encoder_1 alignment (same galaxy vs random)")
+    print("4. encoder_1 alignment (same galaxy vs random)")
     print("=" * 55)
     sim_same   = cosine_sim(euc_emb1, cos_emb1)
     # Shuffle COSMOS embeddings to create random pairs
