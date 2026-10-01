@@ -50,6 +50,63 @@ def _percentile_scale(arr):
     return np.clip((arr - lo) / (hi - lo + 1e-8), 0, 1)
 
 
+def _restyle_for_dark(fig, color="white"):
+    """Recolour a figure's chrome so it reads on a dark background.
+
+    Only the frame, text and marker outlines change. The data colours — the
+    steelblue/darkorange survey clouds and the per-pair star colours — are left
+    untouched, so the light and dark files show exactly the same points and stay
+    comparable side by side.
+
+    Figure-level texts (the suptitle) are recoloured, but per-axes annotations
+    are not: the highlighted-pair numbers are deliberately tinted to match their
+    star, and overriding them to white would throw away that pairing.
+    """
+    for text in fig.texts:                      # suptitle lives here
+        text.set_color(color)
+
+    for ax in fig.axes:
+        ax.title.set_color(color)
+        ax.xaxis.label.set_color(color)
+        ax.yaxis.label.set_color(color)
+        ax.tick_params(axis="both", colors=color)
+        for spine in ax.spines.values():
+            spine.set_color(color)
+
+        # The highlighted stars are outlined in black, which vanishes against a
+        # dark slide. Only collections that actually have an outline are flipped,
+        # so the background scatter (linewidth 0) is left alone.
+        for coll in ax.collections:
+            if np.any(coll.get_linewidths()):
+                coll.set_edgecolor(color)
+
+        legend = ax.get_legend()
+        if legend is not None:
+            for text in legend.get_texts():
+                text.set_color(color)
+            legend.get_frame().set_facecolor("none")
+            legend.get_frame().set_edgecolor(color)
+
+    return fig
+
+
+def _save_both(fig, out_path, dpi=150):
+    """Save `fig` twice: as it is, then a transparent white-on-dark twin.
+
+    The second file lands next to the first with a '_transparent' suffix. It is
+    written last because _restyle_for_dark mutates the figure in place.
+    """
+    fig.savefig(out_path, dpi=dpi, bbox_inches="tight")
+    print(f"Saved: {out_path}")
+
+    base, ext = os.path.splitext(out_path)
+    dark_path = f"{base}_transparent{ext}"
+    _restyle_for_dark(fig)
+    fig.savefig(dark_path, dpi=dpi, bbox_inches="tight", transparent=True)
+    print(f"Saved: {dark_path}")
+    return dark_path
+
+
 def _regions_from_graph(reducer, min_blobs=2, min_size=25):
     """Region label per point, taken from UMAP's own manifold graph.
 
@@ -352,9 +409,8 @@ def main():
 
     fig.suptitle(f"Latent space UMAP  |  N = {N} galaxy pairs", fontsize=15)
     plt.tight_layout()
-    plt.savefig(args.out, dpi=150, bbox_inches="tight")
-    plt.close()
-    print(f"Saved: {args.out}")
+    _save_both(fig, args.out)
+    plt.close(fig)
 
     # --- Separate cutouts figure ---
     if args.out_cutouts is not None:
