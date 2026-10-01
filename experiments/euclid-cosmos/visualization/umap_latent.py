@@ -290,19 +290,19 @@ def main():
 
     for k, (pid, color) in enumerate(zip(pair_ids, pair_colors)):
         label = str(k + 1)
-        ax1.scatter(euc_u1[pid, 0], euc_u1[pid, 1], s=144, color=color,
-                    marker="*", edgecolors="black", linewidths=0.4, zorder=5)
-        ax1.scatter(cos_u1[pid, 0], cos_u1[pid, 1], s=144, color=color,
-                    marker="*", edgecolors="black", linewidths=0.4, zorder=5)
+        ax1.scatter(euc_u1[pid, 0], euc_u1[pid, 1], s=400, color=color,
+                    marker="*", edgecolors="black", linewidths=0.8, zorder=5)
+        ax1.scatter(cos_u1[pid, 0], cos_u1[pid, 1], s=400, color=color,
+                    marker="*", edgecolors="black", linewidths=0.8, zorder=5)
         for x, y in [(euc_u1[pid, 0], euc_u1[pid, 1]),
                      (cos_u1[pid, 0], cos_u1[pid, 1])]:
             ax1.annotate(label, xy=(x, y), xytext=(4, 4), textcoords="offset points",
-                         fontsize=10, color=color, fontweight="bold")
+                         fontsize=13, color=color, fontweight="bold")
 
     legend_handles = [
         Line2D([0], [0], marker="o", color="w", markerfacecolor="steelblue",  markersize=10, label="Euclid NIR-H"),
         Line2D([0], [0], marker="o", color="w", markerfacecolor="darkorange", markersize=10, label="COSMOS F150W"),
-        Line2D([0], [0], marker="*", color="w", markerfacecolor="gray", markersize=12,
+        Line2D([0], [0], marker="*", color="w", markerfacecolor="gray", markersize=20,
                markeredgecolor="black", label=f"{len(pair_ids)} highlighted pairs"),
     ]
     # Blob labels. Each encoder is grouped in its own embedding, so ax1 gets
@@ -329,14 +329,14 @@ def main():
 
     for k, (pid, color) in enumerate(zip(pair_ids, pair_colors)):
         label = str(k + 1)
-        ax2.scatter(euc_u2[pid, 0], euc_u2[pid, 1], s=144, color=color,
-                    marker="*", edgecolors="black", linewidths=0.4, zorder=5)
-        ax2.scatter(cos_u2[pid, 0], cos_u2[pid, 1], s=144, color=color,
-                    marker="*", edgecolors="black", linewidths=0.4, zorder=5)
+        ax2.scatter(euc_u2[pid, 0], euc_u2[pid, 1], s=400, color=color,
+                    marker="*", edgecolors="black", linewidths=0.8, zorder=5)
+        ax2.scatter(cos_u2[pid, 0], cos_u2[pid, 1], s=400, color=color,
+                    marker="*", edgecolors="black", linewidths=0.8, zorder=5)
         for x, y in [(euc_u2[pid, 0], euc_u2[pid, 1]),
                      (cos_u2[pid, 0], cos_u2[pid, 1])]:
             ax2.annotate(label, xy=(x, y), xytext=(4, 4), textcoords="offset points",
-                         fontsize=10, color=color, fontweight="bold")
+                         fontsize=13, color=color, fontweight="bold")
 
     # for g in range(n_groups2):
     #     blob = umap_emb2[groups2 == g]
