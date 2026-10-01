@@ -90,18 +90,23 @@ def _restyle_for_dark(fig, color="white"):
     return fig
 
 
-def _save_both(fig, out_path, dpi=150):
-    """Save `fig` twice: as it is, then a transparent white-on-dark twin.
+def _save_both(fig, out_path, dpi=150, restyle=True):
+    """Save `fig` twice: as it is, then again with a transparent background.
 
-    The second file lands next to the first with a '_transparent' suffix. It is
+    The second file lands next to the first with a '_transparent' suffix, and is
     written last because _restyle_for_dark mutates the figure in place.
+
+    restyle=False keeps every colour exactly as drawn and only drops the
+    background — for figures whose colours already carry meaning, like the
+    cutouts grid where each panel's border encodes its pair.
     """
     fig.savefig(out_path, dpi=dpi, bbox_inches="tight")
     print(f"Saved: {out_path}")
 
     base, ext = os.path.splitext(out_path)
     dark_path = f"{base}_transparent{ext}"
-    _restyle_for_dark(fig)
+    if restyle:
+        _restyle_for_dark(fig)
     fig.savefig(dark_path, dpi=dpi, bbox_inches="tight", transparent=True)
     print(f"Saved: {dark_path}")
     return dark_path
@@ -448,9 +453,10 @@ def main():
 
         #fig2.suptitle("Highlighted galaxy cutouts", fontsize=15)
         plt.tight_layout()
-        plt.savefig(args.out_cutouts, dpi=150, bbox_inches="tight")
-        plt.close()
-        print(f"Saved cutouts: {args.out_cutouts}")
+        # Colours stay as drawn here: the per-panel border and title colour is
+        # what ties a cutout back to its star in the UMAP panel.
+        _save_both(fig2, args.out_cutouts, restyle=False)
+        plt.close(fig2)
 
     # --- Assign every galaxy to the blob its point lands in, per encoder ---
     # Always written, next to --out. Blobs were already found above (they label
