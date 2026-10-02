@@ -83,10 +83,10 @@ def main():
 
     #--------------------------------------------------------------------------------------------
 
-    #Save all files from a directory. This case F150W.
+    #Save all files from a directory. This case F115W.
 
-    INPUT_DIR = '/n03data/fontirro/cutouts/cosmos/256_cutouts_new/f150w'
-    OUTPUT_DIR = '/n03data/fontirro/cutouts/cosmos/256_cutouts_new_rotated/f150w'
+    INPUT_DIR = '/n03data/fontirro/cutouts/cosmos/256_cutouts_new/f115w'
+    OUTPUT_DIR = '/n03data/fontirro/cutouts/cosmos/256_cutouts_new_rotated/f115w'
 
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
