@@ -63,19 +63,36 @@ def main():
     tile = row['tile'].values[0]
     for i, filt in enumerate(COS_FIL):
         ax = axes[1, i]
-        cosmos_cutout_path = os.path.join(
-            COSMOS_DIR_PATH, filt, f"{filt.upper()}_{id_cos}_{tile}.fits"
-        )
-        if os.path.exists(cosmos_cutout_path):
-            with fits.open(cosmos_cutout_path) as hdu:
-                data = hdu[0].data
-                data = crop(data, 120, 120)
-                ax.imshow(data, origin='lower', cmap='plasma',
-                          norm=ImageNormalize(data, interval=PercentileInterval(99.5),
-                                              stretch=AsinhStretch()))
-                ax.set_title(f"COSMOS {filt.upper()}")
+        if filt == 'f115w':
+            COSMOS_DIR_PATH = "/n03data/fontirro/cutouts/cosmos"
+            cosmos_cutout_path = os.path.join(
+                COSMOS_DIR_PATH, filt, f"{filt.upper()}_{id_cos}_{tile}.fits"
+            )
+            if os.path.exists(cosmos_cutout_path):
+                with fits.open(cosmos_cutout_path) as hdu:
+                    data = hdu[0].data
+                    data = crop(data, 120, 120)
+                    ax.imshow(data, origin='lower', cmap='plasma',
+                            norm=ImageNormalize(data, interval=PercentileInterval(99.5),
+                                                stretch=AsinhStretch()))
+                    ax.set_title(f"COSMOS {filt.upper()}")
+            else:
+                print(f"File not found: {cosmos_cutout_path}")
+
         else:
-            print(f"File not found: {cosmos_cutout_path}")
+            cosmos_cutout_path = os.path.join(
+                COSMOS_DIR_PATH, filt, f"{filt.upper()}_{id_cos}_{tile}.fits"
+            )
+            if os.path.exists(cosmos_cutout_path):
+                with fits.open(cosmos_cutout_path) as hdu:
+                    data = hdu[0].data
+                    data = crop(data, 120, 120)
+                    ax.imshow(data, origin='lower', cmap='plasma',
+                            norm=ImageNormalize(data, interval=PercentileInterval(99.5),
+                                                stretch=AsinhStretch()))
+                    ax.set_title(f"COSMOS {filt.upper()}")
+            else:
+                print(f"File not found: {cosmos_cutout_path}")
 
 
     fig.savefig(os.path.join(OUT_DIR, f"cutouts_{id_cos}.png"), dpi=300, bbox_inches='tight')
