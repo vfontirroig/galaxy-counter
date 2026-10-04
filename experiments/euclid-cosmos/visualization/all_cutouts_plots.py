@@ -63,7 +63,7 @@ def main():
     tile = row['tile'].values[0]
     for i, filt in enumerate(COS_FIL):
         ax = axes[1, i]
-        if filt == 'f115w':
+        if filt == 'f150w':
             COSMOS_DIR_PATH = "/n03data/fontirro/cutouts/cosmos"
             cosmos_cutout_path = os.path.join(
                 COSMOS_DIR_PATH, f"{filt.upper()}_{id_cos}_{tile}.fits"
