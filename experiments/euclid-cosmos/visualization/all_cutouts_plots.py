@@ -32,7 +32,7 @@ def main():
 
     # Plot Euclid cutouts
     for i, filter in enumerate(EUC_FIL):
-        euclid_cutout_path = os.path.join(EUCLID_DIR_PATH, filter, cat.loc[cat['id'] == id_cos]['59_raw_file_euclid_{filter}'].values[0])
+        euclid_cutout_path = os.path.join(EUCLID_DIR_PATH, filter, cat.loc[cat['id'] == id_cos][f'59_raw_file_euclid_{filter}'].values[0])
         if os.path.exists(euclid_cutout_path):
             with fits.open(euclid_cutout_path) as hdu:
                 data = hdu[0].data
