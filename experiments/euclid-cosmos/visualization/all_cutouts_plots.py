@@ -42,9 +42,7 @@ def main():
                 ax.set_title(f"Euclid {filter.upper()}")
                 ax.axis('off')
         else:
-            ax[i].text(0.5, 0.5, 'No Data', horizontalalignment='center', verticalalignment='center')
-            ax[i].set_title(f"Euclid {filter.upper()}")
-            ax[i].axis('off')
+            print(f"File not found: {euclid_cutout_path}")
 
     plt.savefig(os.path.join(OUT_DIR, f"cutouts_{id_cos}.png"), dpi=300, bbox_inches='tight')
 
