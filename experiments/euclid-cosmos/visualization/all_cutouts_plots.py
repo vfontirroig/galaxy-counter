@@ -61,7 +61,7 @@ def main():
     for i, filt in enumerate(COS_FIL):
         ax = axes[1, i]
         cosmos_cutout_path = os.path.join(
-            COSMOS_DIR_PATH, f"{filt.upper()}_{id_cos}_{tile}.fits"
+            COSMOS_DIR_PATH, filt, f"{filt.upper()}_{id_cos}_{tile}.fits"
         )
         if os.path.exists(cosmos_cutout_path):
             with fits.open(cosmos_cutout_path) as hdu:
