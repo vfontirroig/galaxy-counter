@@ -63,14 +63,25 @@ def process_file(args: tuple) -> tuple:
 def main():
     # Example usage
     
-    # print("Reading file")
-    # fits_file_ex = '/n03data/fontirro/cutouts/cosmos/256_cutouts/f115w/F115W_5.fits'
+    print("Reading file")
+    fits_file_ex =  '/n03data/fontirro/cutouts/cosmos/F150W_680102_B8.fits'
 
 
-    # hdu_aligned = rotate(fits_file_ex)
-    # wcs = WCS(hdu_aligned.header)
-    # print(wcs)
-    # print(hdu_aligned.data.shape)
+
+    hdu_aligned = rotate(fits_file_ex)
+    wcs = WCS(hdu_aligned.header)
+    print(wcs)
+    print(hdu_aligned.data.shape)
+
+    # Write the rotated cutout out. The name is derived from the input so that
+    # changing fits_file_ex above does not silently overwrite a previous result.
+    out_dir = '/n03data/fontirro/cutouts/cosmos'
+
+    out_path = os.path.join(out_dir, f"{fits_file_ex}_rotated.fits")
+    hdu_aligned.writeto(out_path, overwrite=True)
+    print(f"Saved: {out_path}")
+
+    
 
     # fig, ax = plt.subplots(1, 1, figsize=(5, 5), subplot_kw=dict(projection=wcs))
     # ax.imshow(hdu_aligned.data, origin='lower', cmap='plasma', norm=ImageNormalize(hdu_aligned.data, interval=PercentileInterval(99.5), stretch=AsinhStretch()))
@@ -85,25 +96,25 @@ def main():
 
     #Save all files from a directory. This case F277W.
 
-    INPUT_DIR = '/n03data/fontirro/cutouts/cosmos/256_cutouts_new/f277w'
-    OUTPUT_DIR = '/n03data/fontirro/cutouts/cosmos/256_cutouts_new_rotated/f277w'
+    # INPUT_DIR = '/n03data/fontirro/cutouts/cosmos/256_cutouts_new/f277w'
+    # OUTPUT_DIR = '/n03data/fontirro/cutouts/cosmos/256_cutouts_new_rotated/f277w'
 
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    # os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    files_f150w = [f for f in os.listdir(INPUT_DIR) if f.endswith('.fits')]
-    args_list = [(f, INPUT_DIR, OUTPUT_DIR) for f in files_f150w] 
+    # files_f150w = [f for f in os.listdir(INPUT_DIR) if f.endswith('.fits')]
+    # args_list = [(f, INPUT_DIR, OUTPUT_DIR) for f in files_f150w] 
 
-    skipped = 0
-    with ProcessPoolExecutor(max_workers=NUM_WORKERS) as executor:
-        results = executor.map(process_file, args_list)
-        for file, err in tqdm(results, total=len(args_list), desc="Rotating"):
-            if err:
-                print(f"\n[WARN] skipping {file}: {err}")
-                skipped += 1
+    # skipped = 0
+    # with ProcessPoolExecutor(max_workers=NUM_WORKERS) as executor:
+    #     results = executor.map(process_file, args_list)
+    #     for file, err in tqdm(results, total=len(args_list), desc="Rotating"):
+    #         if err:
+    #             print(f"\n[WARN] skipping {file}: {err}")
+    #             skipped += 1
 
-    print(f"Done. {len(args_list) - skipped}/{len(args_list)} files rotated and saved to {OUTPUT_DIR}")
-    if skipped:
-        print(f"  {skipped} files skipped due to errors.")
+    # print(f"Done. {len(args_list) - skipped}/{len(args_list)} files rotated and saved to {OUTPUT_DIR}")
+    # if skipped:
+    #     print(f"  {skipped} files skipped due to errors.")
 
 
 if __name__ == "__main__":
