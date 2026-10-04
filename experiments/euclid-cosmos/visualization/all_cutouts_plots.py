@@ -28,23 +28,36 @@ def main():
 
     id_cos = 680102
 
-    ax, fig = plt.subplots(2, 4, figsize=(16, 8))
+    row = cat.loc[cat['id'] == id_cos]
+    if row.empty:
+        raise SystemExit(f"id {id_cos} not found in {CAT_FILE}")
 
-    # Plot Euclid cutouts
-    for i, filter in enumerate(EUC_FIL):
-        euclid_cutout_path = os.path.join(EUCLID_DIR_PATH, filter, cat.loc[cat['id'] == id_cos][f'59_raw_file_euclid_{filter}'].values[0])
+    fig, axes = plt.subplots(2, 4, figsize=(16, 8))
+
+    # Every panel starts blank, so the ones with no cutout (the 4th COSMOS slot,
+    # or any missing file) come out empty rather than as an empty labelled box.
+    for ax in axes.flat:
+        ax.axis('off')
+
+    # Plot Euclid cutouts — top row
+    for i, filt in enumerate(EUC_FIL):
+        ax = axes[0, i]
+        euclid_cutout_path = os.path.join(
+            EUCLID_DIR_PATH, filt, row[f'59_raw_file_euclid_{filt}'].values[0]
+        )
         if os.path.exists(euclid_cutout_path):
             with fits.open(euclid_cutout_path) as hdu:
                 data = hdu[0].data
-                wcs = WCS(hdu[0].header)
-                ax = ax[i]
-                ax.imshow(data, origin='lower', cmap='plasma', norm=ImageNormalize(data, interval=PercentileInterval(99.5), stretch=AsinhStretch()))
-                ax.set_title(f"Euclid {filter.upper()}")
-                ax.axis('off')
+                ax.imshow(data, origin='lower', cmap='plasma',
+                          norm=ImageNormalize(data, interval=PercentileInterval(99.5),
+                                              stretch=AsinhStretch()))
+                ax.set_title(f"Euclid {filt.upper()}")
         else:
             print(f"File not found: {euclid_cutout_path}")
 
-    plt.savefig(os.path.join(OUT_DIR, f"cutouts_{id_cos}.png"), dpi=300, bbox_inches='tight')
+    fig.savefig(os.path.join(OUT_DIR, f"cutouts_{id_cos}.png"), dpi=300, bbox_inches='tight')
+    plt.close(fig)
+    print(f"Saved: {os.path.join(OUT_DIR, f'cutouts_{id_cos}.png')}")
 
 
     # # Plot COSMOS cutouts
