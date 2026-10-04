@@ -36,8 +36,6 @@ def main():
     if row.empty:
         raise SystemExit(f"id {id_cos} not found in {CAT_FILE}")
 
-    fig, axes = plt.subplots(2, 4, figsize=(16, 8))
-
     with plt.rc_context({'axes.facecolor':  'black',
                      'figure.facecolor': 'black',
                      'axes.edgecolor':  'white',
@@ -45,8 +43,14 @@ def main():
                      'xtick.color':     'white',
                      'ytick.color':     'white',
                      'text.color':      'white'}):
-    # Every panel starts blank, so the ones with no cutout (the 4th COSMOS slot,
-    # or any missing file) come out empty rather than as an empty labelled box.
+        # The figure has to be created INSIDE the context: rcParams are read when
+        # an artist is built, so a figure made before the with block keeps the
+        # default white background whatever the context says afterwards.
+        fig, axes = plt.subplots(2, 4, figsize=(16, 8))
+
+        # Every panel starts blank, so the ones with no cutout (the 4th COSMOS
+        # slot, or any missing file) come out empty rather than as an empty
+        # labelled box.
         for ax in axes.flat:
             ax.axis('off')
 
