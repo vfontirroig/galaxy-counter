@@ -27,7 +27,7 @@ def main():
     # Load the catalog
     cat = pd.read_csv(CAT_FILE)
     sel = cat.copy()
-    sel = sel[(sel['cutout_euc_59_vis'] == 1) & 
+    sel = sel.loc[(sel['cutout_euc_59_vis'] == 1) &
               (sel['cutout_euc_59_nir_y'] == 1) &
               (sel['cutout_euc_59_nir_j'] == 1) &
               (sel['cutout_euc_59_nir_h'] == 1) &
