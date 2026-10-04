@@ -17,7 +17,10 @@ COSMOS_DIR_PATH = "/n03data/fontirro/cutouts/cosmos/256_cutouts_new_rotated"  # 
 EUC_FIL = ['vis', 'nir_y', 'nir_j', 'nir_h']  # Euclid filters
 COS_FIL = ['f115w', 'f150w', 'f277w']  # COSMOS filters
 
-
+def crop(img, h, w):
+    start_y = (img.shape[0] - h) // 2 
+    start_x = (img.shape[1] - w) // 2 
+    return img[start_y : start_y + h, start_x : start_x + w]
 
 def main():
     # Load the catalog
@@ -48,7 +51,7 @@ def main():
         if os.path.exists(euclid_cutout_path):
             with fits.open(euclid_cutout_path) as hdu:
                 data = hdu[0].data
-                ax.imshow(data, origin='lower', cmap='plasma',
+                ax.imshow(crop(data, 36, 36), origin='lower', cmap='plasma',
                           norm=ImageNormalize(data, interval=PercentileInterval(99.5),
                                               stretch=AsinhStretch()))
                 ax.set_title(f"Euclid {filt.upper()}")
@@ -66,6 +69,7 @@ def main():
         if os.path.exists(cosmos_cutout_path):
             with fits.open(cosmos_cutout_path) as hdu:
                 data = hdu[0].data
+                data = crop(data, 120, 120)
                 ax.imshow(data, origin='lower', cmap='plasma',
                           norm=ImageNormalize(data, interval=PercentileInterval(99.5),
                                               stretch=AsinhStretch()))
