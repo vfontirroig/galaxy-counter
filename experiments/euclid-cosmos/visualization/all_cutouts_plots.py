@@ -62,7 +62,7 @@ def main():
                     ax.imshow(crop(data, 36, 36), origin='lower', cmap='plasma',
                             norm=ImageNormalize(data, interval=PercentileInterval(99.5),
                                                 stretch=AsinhStretch()))
-                    ax.set_title(f"Euclid {filt.upper()}")
+                    ax.set_title(f"Euclid {filt.upper()}", fontsize=15)
             else:
                 print(f"File not found: {euclid_cutout_path}")
 
@@ -86,14 +86,14 @@ def main():
                     ax.imshow(data, origin='lower', cmap='plasma',
                             norm=ImageNormalize(data, interval=PercentileInterval(99.5),
                                                 stretch=AsinhStretch()))
-                    ax.set_title(f"COSMOS {filt.upper()}")
+                    ax.set_title(f"COSMOS {filt.upper()}", fontsize=15)
             else:
                 print(f"File not found: {cosmos_cutout_path}")
 
 
-    fig.savefig(os.path.join(OUT_DIR, f"cutouts_{id_cos}.png"), dpi=300, bbox_inches='tight')
-    plt.close(fig)
-    print(f"Saved: {os.path.join(OUT_DIR, f'cutouts_{id_cos}.png')}")
+        fig.savefig(os.path.join(OUT_DIR, f"cutouts_{id_cos}.png"), dpi=300, bbox_inches='tight')
+        plt.close(fig)
+        print(f"Saved: {os.path.join(OUT_DIR, f'cutouts_{id_cos}.png')}")
 
 
 
