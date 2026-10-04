@@ -12,6 +12,7 @@ CAT_FILE = '/n03data/fontirro/data_files/cat_crossmatch_v2.csv'
 
 EUCLID_DIR_PATH = "/n03data/fontirro/cutouts/euclid/59_cutouts"  # base directory for Euclid cutouts.
 COSMOS_DIR_PATH = "/n03data/fontirro/cutouts/cosmos/256_cutouts_new_rotated"  # base directory for COSMOS cutouts.
+COSMOS_F150W_DIR = "/n03data/fontirro/cutouts/cosmos"  # f150w is not under the rotated tree
 
 
 EUC_FIL = ['vis', 'nir_y', 'nir_j', 'nir_h']  # Euclid filters
@@ -63,36 +64,24 @@ def main():
     tile = row['tile'].values[0]
     for i, filt in enumerate(COS_FIL):
         ax = axes[1, i]
-        if filt == 'f150w':
-            COSMOS_DIR_PATH = "/n03data/fontirro/cutouts/cosmos"
-            cosmos_cutout_path = os.path.join(
-                COSMOS_DIR_PATH, f"{filt.upper()}_{id_cos}_{tile}.fits"
-            )
-            if os.path.exists(cosmos_cutout_path):
-                with fits.open(cosmos_cutout_path) as hdu:
-                    data = hdu[0].data
-                    data = crop(data, 120, 120)
-                    ax.imshow(data, origin='lower', cmap='plasma',
-                            norm=ImageNormalize(data, interval=PercentileInterval(99.5),
-                                                stretch=AsinhStretch()))
-                    ax.set_title(f"COSMOS {filt.upper()}")
-            else:
-                print(f"File not found: {cosmos_cutout_path}")
-
+        # f150w sits loose in the cosmos directory; the others are filed under a
+        # per-filter subdirectory of the rotated set. Only the directory differs,
+        # so pick it first and share one read/plot path.
+        cosmos_dir = (COSMOS_F150W_DIR if filt == 'f150w'
+                      else os.path.join(COSMOS_DIR_PATH, filt))
+        cosmos_cutout_path = os.path.join(
+            cosmos_dir, f"{filt.upper()}_{id_cos}_{tile}.fits"
+        )
+        if os.path.exists(cosmos_cutout_path):
+            with fits.open(cosmos_cutout_path) as hdu:
+                data = hdu[0].data
+                data = crop(data, 120, 120)
+                ax.imshow(data, origin='lower', cmap='plasma',
+                          norm=ImageNormalize(data, interval=PercentileInterval(99.5),
+                                              stretch=AsinhStretch()))
+                ax.set_title(f"COSMOS {filt.upper()}")
         else:
-            cosmos_cutout_path = os.path.join(
-                COSMOS_DIR_PATH, filt, f"{filt.upper()}_{id_cos}_{tile}.fits"
-            )
-            if os.path.exists(cosmos_cutout_path):
-                with fits.open(cosmos_cutout_path) as hdu:
-                    data = hdu[0].data
-                    data = crop(data, 120, 120)
-                    ax.imshow(data, origin='lower', cmap='plasma',
-                            norm=ImageNormalize(data, interval=PercentileInterval(99.5),
-                                                stretch=AsinhStretch()))
-                    ax.set_title(f"COSMOS {filt.upper()}")
-            else:
-                print(f"File not found: {cosmos_cutout_path}")
+            print(f"File not found: {cosmos_cutout_path}")
 
 
     fig.savefig(os.path.join(OUT_DIR, f"cutouts_{id_cos}.png"), dpi=300, bbox_inches='tight')
