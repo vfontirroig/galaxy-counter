@@ -264,8 +264,8 @@ def preprocess_image(
 
 
 # Define ordered band lists for v2 lookup
-EUC_BANDS = ["EUC-VIS", "EUC-Y", "EUC-J", "EUC-K"]
-COSMOS_BANDS = ["COS-F115W", "COS-F150W", "COS-F277W", "COS-F444W"]
+EUC_BANDS = ["VIS", "NIR_Y", "NIR_J", "NIR_H"]
+COSMOS_BANDS = ["F115W", "F150W", "F277W", "F444W"]
 
 
 def preprocess_image_v2(
@@ -356,7 +356,7 @@ def main():
 
 
     #label,filepath,hdu_index, band =  "EUC-VIS", EUCLID_FILE, 1, "VIS"
-    label,filepath,hdu_index, band =  "COS-F150W", COSMOS_FILE, 0, "F150W"
+    label,filepath,hdu_index, band =  "F150W", COSMOS_FILE, 0, "F150W"
 
 
     print("\n" + "=" * 60)
