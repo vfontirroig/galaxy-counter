@@ -789,13 +789,23 @@ class ConditionalFlowMatchingModule(pl.LightningModule):
             mse_masks = None
             if hasattr(self, '_val_mse_masks_batch') and self._val_mse_masks_batch is not None:
                 mse_masks = self._val_mse_masks_batch.to(self.device)
+            # Named once and reused for both the call and the lookups below.
+            # mse_by_size is keyed BY these sizes, so a literal that is not in
+            # the tuple is a KeyError at the first validation.
+            #
+            # 64 = the whole cutout (so "val/mse" includes the sky background),
+            # 48 and 32 progressively restrict to the galaxy. The FIRST entry is
+            # the primary: it is what "val/mse" reports and what the per-survey
+            # breakdown is computed over (see primary_mask_size in compute_mse).
+            # The rest are logged as "val/mse_<size>".
+            mse_sizes = (64, 48, 32)
             mse_by_size, mse_hsc, mse_legacy = self.compute_mse(
                 self._val_mse_target_batch.to(self.device),
                 self._val_mse_samegal_batch.to(self.device),
                 self._val_mse_sameins_batch.to(self.device),
                 self._val_mse_metadata,
                 masks=mse_masks,
-                mask_sizes=(64, 32),
+                mask_sizes=mse_sizes,
             )
             mse_time = time.time() - mse_start_time
 
@@ -804,8 +814,9 @@ class ConditionalFlowMatchingModule(pl.LightningModule):
                 print(f"[MSE metric] Computation took {mse_time:.2f} seconds")
                 self._mse_timing_logged = True
 
-            self.log("val/mse", mse_by_size[48], sync_dist=True)
-            self.log("val/mse_32", mse_by_size[32], sync_dist=True)
+            self.log("val/mse", mse_by_size[mse_sizes[0]], sync_dist=True)
+            for mask_size in mse_sizes[1:]:
+                self.log(f"val/mse_{mask_size}", mse_by_size[mask_size], sync_dist=True)
             if mse_hsc is not None:
                 self.log(f"val/mse_{self.survey_a}", mse_hsc, sync_dist=True)
             if mse_legacy is not None:
