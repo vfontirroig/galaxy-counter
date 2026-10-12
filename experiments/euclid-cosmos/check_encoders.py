@@ -19,7 +19,13 @@ Checks:
 Usage:
     python experiments/euclid-cosmos/check_encoders.py \
         --checkpoint /n03data/fontirro/checkpoints/euclid-cosmos-phase1/best-....ckpt \
-        --h5         /n03data/fontirro/data_files/euclid_cosmos_pairs.h5
+        --h5         /n03data/fontirro/data_files/euclid_cosmos_pairs.h5 \
+        --indices    /n03data/fontirro/checkpoints/euclid-cosmos-phase1/val_indices.npy
+
+Pass --indices whenever you have it. The encoders are trained by the geometric
+loss, so an overfit run aligns its TRAINING pairs well while generalising poorly;
+measured on a sample that includes those pairs, check 5 below reports how well the
+model memorised rather than how well it learned.
 """
 
 import os
@@ -85,7 +91,15 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument("--checkpoint", required=True)
     p.add_argument("--h5",         required=True)
-    p.add_argument("--n-samples",  type=int, default=256)
+    p.add_argument("--indices",    default=None,
+                   help="Optional .npy file of indices (e.g. the val_indices.npy "
+                        "or test_indices.npy written into CKPT_DIR by train.py). "
+                        "Strongly preferred: without it the sample is drawn from "
+                        "the whole dataset, so the alignment numbers below are "
+                        "measured mostly on galaxies the model was trained on and "
+                        "will flatter an overfit run.")
+    p.add_argument("--n-samples",  type=int, default=256,
+                   help="Number of galaxy pairs to encode (ignored if --indices given)")
     args = p.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -99,8 +113,20 @@ def main():
 
     # --- Load a batch ---
     dataset = EuclidCosmosDataset(args.h5)
-    n = min(args.n_samples, len(dataset))
-    indices = np.random.default_rng(42).choice(len(dataset), size=n, replace=False).tolist()
+    if args.indices is not None:
+        indices = np.load(args.indices).tolist()
+        if args.n_samples > 0 and len(indices) > args.n_samples:
+            indices = np.random.default_rng(42).choice(
+                indices, size=args.n_samples, replace=False).tolist()
+        print(f"Using {len(indices)} held-out indices from {args.indices}")
+    else:
+        n = min(args.n_samples, len(dataset))
+        indices = np.random.default_rng(42).choice(
+            len(dataset), size=n, replace=False).tolist()
+        print(f"Using {n} indices sampled from the WHOLE dataset — these include "
+              f"training galaxies, so treat the alignment numbers as optimistic. "
+              f"Pass --indices CKPT_DIR/val_indices.npy for a held-out measurement.")
+    n = len(indices)
     loader = DataLoader(Subset(dataset, indices), batch_size=n,
                         collate_fn=partial(collate_fn, dataset=dataset), num_workers=2)
     euclid, cosmos, sameins, masks, _ = next(iter(loader))

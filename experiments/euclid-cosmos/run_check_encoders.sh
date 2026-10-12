@@ -15,4 +15,5 @@ CKPT_DIR="/n03data/fontirro/euclid-cosmos/checkpoints/euclid-cosmos-nir-h-f150w/
 
 python /n03data/fontirro/euclid-cosmos/galaxy-counter/experiments/euclid-cosmos/check_encoders.py \
     --checkpoint "${CKPT_DIR}/best-epoch=40-step=50000.ckpt" \
-    --h5         "/n03data/fontirro/data_files/euclid_cosmos_pairs_nir_h_f150w_v1.h5"
+    --h5         "/n03data/fontirro/data_files/euclid_cosmos_pairs_nir_h_f150w_v1.h5" \
+    --indices    "${CKPT_DIR}/val_indices.npy"

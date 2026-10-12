@@ -8,9 +8,11 @@ Train the flow-matching model on paired Euclid (NIR H) x COSMOS (F150W) cutouts.
     separation, written into H5_PATH by experiments/euclid-cosmos/neighbors.py —
     run that script first). Rows with no neighbor found (neighbor_idx == -1)
     fall back to random_sameins so sameins is always populated.
-  - lambda_geometric=0 matches the project default (see neighbours_train.py),
+  - lambda_geometric=0.3 (the module default) turns on the alignment term. It is
     independent of encoder_2/sameins: the geometric loss only compares
-    encoder_1(target) against encoder_1(samegal counterpart).
+    encoder_1(target) against encoder_1(samegal counterpart). Earlier runs had it
+    at 0, so nothing explicitly aligned the two surveys' embeddings and any
+    structure in the latent space was a by-product of the generative loss.
 
 Run locally (single GPU, for a quick sanity check):
     python experiments/euclid-cosmos/train.py
@@ -245,13 +247,13 @@ class EuclidCosmosModel(ConditionalFlowMatchingModule):
 # CONFIG — edit before running
 # ---------------------------------------------------------------------------
 H5_PATH     = "/n03data/fontirro/data_files/euclid_cosmos_pairs_nir_h_f150w_v2.h5"
-CKPT_DIR    = "/n03data/fontirro/euclid-cosmos/checkpoints/euclid-cosmos-nir-h-f150w/test-1-phase1/v2"  # where to save checkpoints and logs
+CKPT_DIR    = "/n03data/fontirro/euclid-cosmos/checkpoints/euclid-cosmos-nir-h-f150w/test-1-phase1/v3"  # where to save checkpoints and logs
 
 BATCH_SIZE  = 64
 NUM_WORKERS = 16
 VAL_RATIO   = 0.1
 TEST_RATIO  = 0.05
-NUM_STEPS   = 300_000
+NUM_STEPS   = 100_000
 IMAGE_SIZE  = 64      #Cutout spatial size
 LR          = 1e-4    #learning rate for AdamW optimizer
 
@@ -404,7 +406,12 @@ def main():
         num_mse_images=32,
         num_integration_steps=250,
         lambda_generative=1.0,
-        lambda_geometric=0.0,     # no neighbors yet → geometric loss disabled
+        # Aligns encoder_1's embedding of the anchor with its embedding of the
+        # same galaxy's counterpart, via a Sinkhorn loss over the flattened
+        # (seq_len * embed_dim) vectors. Despite the old comment here, it needs
+        # no neighbours: it reads x_1 and cond_image_samegal only, both of which
+        # every pair has. 0.3 is the module default.
+        lambda_geometric=0.3,
         mask_center=False,
     )
 
@@ -425,12 +432,17 @@ def main():
         save_top_k=1,
         filename="latest-step={step}",
     )
-    # early_stopping = EarlyStopping(
-    #     monitor="val/loss",
-    #     mode="min",
-    #     patience=20,  # in validation checks, i.e. 20 * val_check_interval = 20_000 steps
-    #     verbose=True,
-    # )
+    early_stopping = EarlyStopping(
+        monitor="val/loss",
+        mode="min",
+        # Counted in validation checks, so 5 * val_check_interval = 5_000 steps.
+        # The previous value of 20 (20_000 steps) let the v6 run carry on well
+        # past the val minimum: val/loss bottomed early and then climbed for the
+        # rest of the run while train/loss kept falling.
+        patience=5,
+        min_delta=1e-4,  # ignore noise-level "improvements" that reset patience
+        verbose=True,
+    )
 
     trainer = pl.Trainer(
         max_steps=max(1, int(NUM_STEPS / N_GPUS)),
@@ -442,7 +454,7 @@ def main():
         precision="bf16-mixed",
         val_check_interval=1000,
         check_val_every_n_epoch=None,
-        callbacks=[best_checkpoint, periodic_checkpoint],
+        callbacks=[best_checkpoint, periodic_checkpoint, early_stopping],
         num_sanity_val_steps=2,
     )
 
