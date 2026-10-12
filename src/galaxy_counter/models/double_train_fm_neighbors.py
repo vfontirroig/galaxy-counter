@@ -117,6 +117,15 @@ class ConditionalFlowMatchingModule(pl.LightningModule):
         lambda_geometric: float = 0.3, # weight for geometric loss
         num_umap_batches: int = 8, # number of validation batches to collect for UMAP visualization
         mask_center: bool = False, # if true -> mask the center of the image
+        # The two anchor surveys, as they appear in metadata['anchor_survey'].
+        # They split the generative loss and the MSE metric per direction, and
+        # they name those metrics ("val/mse_<survey_a>", ...). Defaults keep the
+        # original HSC x Legacy runs working; the euclid-cosmos experiment passes
+        # ('euclid', 'cosmos'). A name that never appears in the metadata makes
+        # its metrics silently NaN, which is what happened to the euclid-cosmos
+        # runs while these were hardcoded to hsc/legacy.
+        survey_a: str = 'hsc',
+        survey_b: str = 'legacy',
     ):
         super().__init__()
         self.save_hyperparameters()
@@ -133,6 +142,8 @@ class ConditionalFlowMatchingModule(pl.LightningModule):
         self.lambda_geometric = lambda_geometric
         self.num_umap_batches = num_umap_batches
         self.mask_center = mask_center
+        self.survey_a = survey_a
+        self.survey_b = survey_b
 
         # Detect H100 GPU
         self.is_h100 = is_h100_gpu()
@@ -300,8 +311,8 @@ class ConditionalFlowMatchingModule(pl.LightningModule):
             anchor_surveys = [m['anchor_survey'] for m in metadata]
 
             # Create boolean masks (on the same device as your loss tensor)
-            is_hsc = torch.tensor([s == 'hsc' for s in anchor_surveys], device=per_example_loss.device)
-            is_legacy = torch.tensor([s == 'legacy' for s in anchor_surveys], device=per_example_loss.device)
+            is_hsc = torch.tensor([s == self.survey_a for s in anchor_surveys], device=per_example_loss.device)
+            is_legacy = torch.tensor([s == self.survey_b for s in anchor_surveys], device=per_example_loss.device)
 
             # Compute mean losses for each group
             loss_hsc = per_example_loss[is_hsc].mean() if is_hsc.any() else torch.tensor(float('nan'), device=per_example_loss.device)
@@ -384,9 +395,9 @@ class ConditionalFlowMatchingModule(pl.LightningModule):
         if hasattr(self, '_loss_generative_total'):
             self.log("train/loss_generative_total", self._loss_generative_total, on_step=True, on_epoch=True, sync_dist=True)
         if hasattr(self, '_loss_hsc'):
-            self.log("train/loss_generative_hsc", self._loss_hsc, on_step=True, on_epoch=True, sync_dist=True)
+            self.log(f"train/loss_generative_{self.survey_a}", self._loss_hsc, on_step=True, on_epoch=True, sync_dist=True)
         if hasattr(self, '_loss_legacy'):
-            self.log("train/loss_generative_legacy", self._loss_legacy, on_step=True, on_epoch=True, sync_dist=True)
+            self.log(f"train/loss_generative_{self.survey_b}", self._loss_legacy, on_step=True, on_epoch=True, sync_dist=True)
 
         # Log geometric losses
         if hasattr(self, '_loss_geom_total'):
@@ -456,9 +467,9 @@ class ConditionalFlowMatchingModule(pl.LightningModule):
         if hasattr(self, '_loss_generative_total'):
             self.log("val/loss_generative_total", self._loss_generative_total, on_epoch=True, sync_dist=True)
         if hasattr(self, '_loss_hsc'):
-            self.log("val/loss_generative_hsc", self._loss_hsc, on_epoch=True, sync_dist=True)
+            self.log(f"val/loss_generative_{self.survey_a}", self._loss_hsc, on_epoch=True, sync_dist=True)
         if hasattr(self, '_loss_legacy'):
-            self.log("val/loss_generative_legacy", self._loss_legacy, on_epoch=True, sync_dist=True)
+            self.log(f"val/loss_generative_{self.survey_b}", self._loss_legacy, on_epoch=True, sync_dist=True)
 
         # Log geometric losses
         if hasattr(self, '_loss_geom_total'):
@@ -486,8 +497,8 @@ class ConditionalFlowMatchingModule(pl.LightningModule):
 
             # Separate HSC and Legacy images based on anchor_survey
             anchor_surveys = [m['anchor_survey'] for m in metadata]
-            hsc_mask = torch.tensor([s == 'hsc' for s in anchor_surveys], device=anchor_image.device)
-            legacy_mask = torch.tensor([s == 'legacy' for s in anchor_surveys], device=anchor_image.device)
+            hsc_mask = torch.tensor([s == self.survey_a for s in anchor_surveys], device=anchor_image.device)
+            legacy_mask = torch.tensor([s == self.survey_b for s in anchor_surveys], device=anchor_image.device)
 
             # Collect HSC images (anchor_image when anchor_survey == 'hsc')
             if hsc_mask.any():
@@ -597,8 +608,8 @@ class ConditionalFlowMatchingModule(pl.LightningModule):
         mse_legacy = None
         if metadata is not None:
             anchor_surveys = [m['anchor_survey'] for m in metadata]
-            hsc_mask = torch.tensor([s == 'hsc' for s in anchor_surveys], device=device)
-            legacy_mask = torch.tensor([s == 'legacy' for s in anchor_surveys], device=device)
+            hsc_mask = torch.tensor([s == self.survey_a for s in anchor_surveys], device=device)
+            legacy_mask = torch.tensor([s == self.survey_b for s in anchor_surveys], device=device)
 
             if hsc_mask.any():
                 mse_hsc = torch.mean(diff_primary[hsc_mask]**2)
@@ -772,7 +783,7 @@ class ConditionalFlowMatchingModule(pl.LightningModule):
         plt.close(fig_orig)
         plt.close(fig_row)
 
-        # Compute MSE metric (48x48 center = "MSE", 32x32 center = "MSE 32")
+        # Compute MSE metric (64x64 center = "MSE", 32x32 center = "MSE 32")
         if hasattr(self, '_val_mse_target_batch') and hasattr(self, '_val_mse_samegal_batch') and hasattr(self, '_val_mse_sameins_batch'):
             mse_start_time = time.time()
             mse_masks = None
@@ -784,7 +795,7 @@ class ConditionalFlowMatchingModule(pl.LightningModule):
                 self._val_mse_sameins_batch.to(self.device),
                 self._val_mse_metadata,
                 masks=mse_masks,
-                mask_sizes=(48, 32),
+                mask_sizes=(64, 32),
             )
             mse_time = time.time() - mse_start_time
 
@@ -796,9 +807,9 @@ class ConditionalFlowMatchingModule(pl.LightningModule):
             self.log("val/mse", mse_by_size[48], sync_dist=True)
             self.log("val/mse_32", mse_by_size[32], sync_dist=True)
             if mse_hsc is not None:
-                self.log("val/mse_hsc", mse_hsc, sync_dist=True)
+                self.log(f"val/mse_{self.survey_a}", mse_hsc, sync_dist=True)
             if mse_legacy is not None:
-                self.log("val/mse_legacy", mse_legacy, sync_dist=True)
+                self.log(f"val/mse_{self.survey_b}", mse_legacy, sync_dist=True)
 
         # Generate UMAP visualization if we collected enough batches
         if (hasattr(self, '_umap_hsc_batches') and hasattr(self, '_umap_legacy_batches') and

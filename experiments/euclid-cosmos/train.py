@@ -413,6 +413,11 @@ def main():
         # every pair has. 0.3 is the module default.
         lambda_geometric=0.3,
         mask_center=False,
+        # Must match metadata['anchor_survey'] from dataset.py, which emits
+        # "euclid"/"cosmos". The module defaults to the older project's
+        # "hsc"/"legacy", under which every per-direction metric came out NaN.
+        survey_a="euclid",
+        survey_b="cosmos",
     )
 
     csv_logger = CSVLogger(save_dir=CKPT_DIR, name="logs")
