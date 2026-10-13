@@ -418,6 +418,11 @@ def main():
         # "hsc"/"legacy", under which every per-direction metric came out NaN.
         survey_a="euclid",
         survey_b="cosmos",
+        # "max-autotune" reserved ~17 GiB in CUDA-graph private pools on the
+        # L40S and OOM'd during compilation once lambda_geometric added two
+        # extra encoder_1 activation stacks. "default" keeps inductor's kernel
+        # fusion without the CUDA graphs. Set to None to skip compiling.
+        compile_mode="default",
     )
 
     csv_logger = CSVLogger(save_dir=CKPT_DIR, name="logs")

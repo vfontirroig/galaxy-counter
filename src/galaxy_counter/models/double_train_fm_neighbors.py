@@ -126,6 +126,10 @@ class ConditionalFlowMatchingModule(pl.LightningModule):
         # runs while these were hardcoded to hsc/legacy.
         survey_a: str = 'hsc',
         survey_b: str = 'legacy',
+        # torch.compile mode for the velocity model: "max-autotune" (default,
+        # fastest but reserves CUDA-graph memory), "default", or None to skip
+        # compiling. See the note at the compile call below.
+        compile_mode: Optional[str] = 'max-autotune',
     ):
         super().__init__()
         self.save_hyperparameters()
@@ -199,9 +203,19 @@ class ConditionalFlowMatchingModule(pl.LightningModule):
         # second submodule — that would duplicate every UNet parameter under a
         # second set of keys in state_dict() (which, unlike .parameters(), does
         # not dedupe shared tensors across registered submodules).
+        #
+        # compile_mode is configurable because "max-autotune" is expensive in
+        # MEMORY, not just compile time: it enables CUDA graphs, whose private
+        # pools reserved ~17 GiB of a 44 GiB L40S and never release it, and its
+        # autotuner allocates benchmark buffers for ~20 kernel variants per op
+        # while activations are live. That combination OOM'd the euclid-cosmos
+        # run during compilation once the geometric loss added two more
+        # encoder_1 activation stacks. "default" drops CUDA graphs; None skips
+        # compilation entirely.
         object.__setattr__(
             self, "_velocity_model_compiled",
-            torch.compile(self.velocity_model, mode="max-autotune"),
+            self.velocity_model if compile_mode is None
+            else torch.compile(self.velocity_model, mode=compile_mode),
         )
 
         # Initialize geometric loss function once (reused across all training steps)
