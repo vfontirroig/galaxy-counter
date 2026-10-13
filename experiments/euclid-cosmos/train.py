@@ -430,7 +430,9 @@ def main():
     os.makedirs(CKPT_DIR, exist_ok=True)
     best_checkpoint = ModelCheckpoint(
         dirpath=CKPT_DIR,
-        monitor="val/loss",
+        # Generative term only: val/loss also includes lambda_geometric * geom,
+        # so a drop in the alignment term could select a worse generator.
+        monitor="val/loss_generative_total",
         mode="min",
         save_top_k=1,
         filename="best-epoch={epoch:02d}-step={step}",
@@ -443,7 +445,7 @@ def main():
         filename="latest-step={step}",
     )
     early_stopping = EarlyStopping(
-        monitor="val/loss",
+        monitor="val/loss_generative_total",
         mode="min",
         # Counted in validation checks, so 20 * val_check_interval = 20_000 steps
         # of tolerance before the run is stopped.
