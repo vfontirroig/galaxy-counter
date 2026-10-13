@@ -445,11 +445,9 @@ def main():
     early_stopping = EarlyStopping(
         monitor="val/loss",
         mode="min",
-        # Counted in validation checks, so 5 * val_check_interval = 5_000 steps.
-        # The previous value of 20 (20_000 steps) let the v6 run carry on well
-        # past the val minimum: val/loss bottomed early and then climbed for the
-        # rest of the run while train/loss kept falling.
-        patience=5,
+        # Counted in validation checks, so 20 * val_check_interval = 20_000 steps
+        # of tolerance before the run is stopped.
+        patience=20,
         min_delta=1e-4,  # ignore noise-level "improvements" that reset patience
         verbose=True,
     )
