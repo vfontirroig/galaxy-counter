@@ -12,8 +12,8 @@ dataset_idx column of umap_groups_encoder_*.csv.
 
 Usage:
     python experiments/euclid-cosmos/visualization/export_embeddings.py \
-        --checkpoint /n03data/fontirro/checkpoints/euclid-cosmos-phase1/best-epoch=21-step=98000.ckpt \
-        --h5         /n03data/fontirro/data_files/euclid_cosmos_pairs.h5 \
+        --checkpoint /n03data/fontirro/checkpoints/euclid-cosmos-phase1/best-epoch=11-step=14000.ckpt \
+        --h5         /n03data/fontirro/data_files/euclid_cosmos_pairs_nir_h_f150w_v2.h5 \
         --out        /n03data/fontirro/results_model/embeddings.npz
 """
 
