@@ -92,10 +92,10 @@ def main():
 
     ax.set_xticks(x)
     ax.set_xticklabels([str(i) for i in ids], rotation=45 if len(ids) > 10 else 0)
-    ax.set_xlabel("Galaxy (h5 dataset_idx)", color=INK_SECONDARY)
+    ax.set_xlabel("Galaxy indices", color=INK_SECONDARY)
     ax.set_ylabel("Cosine similarity\n(Euclid vs COSMOS)", color=INK_SECONDARY)
     ax.set_ylim(min(0, values.min() - 0.1), 1.05)
-    ax.set_title(f"{label} · {args.variant}", color=INK_PRIMARY, fontsize=11)
+    ax.set_title("Cosine similarity of highlighted galaxies", color=INK_PRIMARY, fontsize=11)
     ax.tick_params(colors=INK_SECONDARY)
     for side in ("top", "right", "bottom"):
         ax.spines[side].set_visible(False)
