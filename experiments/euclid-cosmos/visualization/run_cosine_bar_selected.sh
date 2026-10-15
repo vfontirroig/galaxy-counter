@@ -12,7 +12,7 @@ set -euo pipefail
 source /n03data/fontirro/.galaxy-counter-env/bin/activate
 
 # Same OUT_DIR as run_cosine_similarity.sh, which writes per_galaxy.csv there
-OUT_DIR="/n03data/fontirro/euclid-cosmos/plots_model/euclid-cosmos-nir-h-f150w/test-1-phase1/v3/cosine_similarity"
+OUT_DIR="/n03data/fontirro/euclid-cosmos/plots_model/euclid-cosmos-nir-h-f150w/test-1-phase1/v4/cosine_similarity"
 VARIANT="enc1_flat_global"   # enc{1,2}_{flat,pooled}_{raw,global,per_survey}
 SEED=42
 
