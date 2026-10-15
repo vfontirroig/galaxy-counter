@@ -247,7 +247,7 @@ class EuclidCosmosModel(ConditionalFlowMatchingModule):
 # CONFIG — edit before running
 # ---------------------------------------------------------------------------
 H5_PATH     = "/n03data/fontirro/data_files/euclid_cosmos_pairs_nir_h_f150w_v2.h5"
-CKPT_DIR    = "/n03data/fontirro/euclid-cosmos/checkpoints/euclid-cosmos-nir-h-f150w/test-1-phase1/v7"  # where to save checkpoints and logs
+CKPT_DIR    = "/n03data/fontirro/euclid-cosmos/checkpoints/euclid-cosmos-nir-h-f150w/test-1-phase1/v8"  # where to save checkpoints and logs
 
 BATCH_SIZE  = 64
 NUM_WORKERS = 16
@@ -258,6 +258,7 @@ IMAGE_SIZE  = 64      #Cutout spatial size
 LR          = 1e-4    #learning rate for AdamW optimizer
 
 N_GPUS      = 1       #set to number of GPUs on the node
+LAMBDA_GEO  = 0.5     #weight for the geometric loss
 # ---------------------------------------------------------------------------
 
 
@@ -411,7 +412,7 @@ def main():
         # (seq_len * embed_dim) vectors. Despite the old comment here, it needs
         # no neighbours: it reads x_1 and cond_image_samegal only, both of which
         # every pair has. 0.3 is the module default.
-        lambda_geometric=0.4,
+        lambda_geometric=LAMBDA_GEO,
         mask_center=False,
         # Must match metadata['anchor_survey'] from dataset.py, which emits
         # "euclid"/"cosmos". The module defaults to the older project's
