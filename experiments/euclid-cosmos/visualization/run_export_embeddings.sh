@@ -10,9 +10,9 @@
 #SBATCH --partition=pscompl      # change to your GPU partition
 set -euo pipefail
 
-CKPT_DIR="/n03data/fontirro/euclid-cosmos/checkpoints/euclid-cosmos-nir-h-f150w/test-1-phase1/v3"
+CKPT_DIR="/n03data/fontirro/euclid-cosmos/checkpoints/euclid-cosmos-nir-h-f150w/test-1-phase1/v4"
 H5_FILE="/n03data/fontirro/data_files/euclid_cosmos_pairs_nir_h_f150w_v2.h5"
-OUT_DIR="/n03data/fontirro/euclid-cosmos/checkpoints/euclid-cosmos-nir-h-f150w/test-1-phase1/v3/embeddings"
+OUT_DIR="/n03data/fontirro/euclid-cosmos/checkpoints/euclid-cosmos-nir-h-f150w/test-1-phase1/v4/embeddings"
 
 python /n03data/fontirro/euclid-cosmos/galaxy-counter/experiments/euclid-cosmos/visualization/export_embeddings.py \
 --checkpoint  "${CKPT_DIR}/best-epoch=11-step=14000.ckpt" \
