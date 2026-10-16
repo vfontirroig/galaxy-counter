@@ -247,7 +247,7 @@ class EuclidCosmosModel(ConditionalFlowMatchingModule):
 # CONFIG — edit before running
 # ---------------------------------------------------------------------------
 H5_PATH     = "/n03data/fontirro/data_files/euclid_cosmos_pairs_nir_h_f150w_v2.h5"
-CKPT_DIR    = "/n03data/fontirro/euclid-cosmos/checkpoints/euclid-cosmos-nir-h-f150w/test-1-phase1/v7"  # where to save checkpoints and logs
+CKPT_DIR    = "/n03data/fontirro/euclid-cosmos/checkpoints/euclid-cosmos-nir-h-f150w/test-1-phase1/v8"  # where to save checkpoints and logs
 
 BATCH_SIZE  = 64
 NUM_WORKERS = 16
@@ -258,7 +258,7 @@ IMAGE_SIZE  = 64      #Cutout spatial size
 LR          = 1e-4    #learning rate for AdamW optimizer
 
 N_GPUS      = 1       #set to number of GPUs on the node
-LAMBDA_GEO  = 0.4     #weight for the geometric loss
+LAMBDA_GEO  = 0.5     #weight for the geometric loss
 # ---------------------------------------------------------------------------
 
 
