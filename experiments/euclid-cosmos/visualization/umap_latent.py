@@ -285,6 +285,11 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}")
 
+    # Create the folders the output files go into
+    for path in (args.out, args.out_cutouts):
+        if path is not None:
+            os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+
     # --- Load model ---
     print(f"Loading checkpoint: {args.checkpoint}")
     model = EuclidCosmosModel.load_from_checkpoint(args.checkpoint, map_location=device)
