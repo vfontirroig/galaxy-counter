@@ -44,9 +44,8 @@ ENCODERS = ["1", "2"]
 REPS = ["flat", "pooled"]
 CENTERINGS = ["raw", "global", "per_survey"]
 
-# Reference dataviz palette: slots 1-2 for the two surveys, gray for the baseline
-EUCLID_COLOR = "#2a78d6"
-COSMOS_COLOR = "#eb6834"
+# Reference dataviz palette: slots 1-2 for the two encoders, gray for the axes
+ENCODER_COLORS = {"1": "#2a78d6", "2": "#eb6834"}
 BASELINE_COLOR = "#898781"
 INK_PRIMARY = "#0b0b0b"
 INK_SECONDARY = "#52514e"
@@ -156,91 +155,22 @@ def analyse(euclid, cosmos, train, test, rep, centering, rng):
         "rank_euclid_to_cosmos": rank_e2c,
         "rank_cosmos_to_euclid": rank_c2e,
     }
-    curves = {"matched": matched, "random": random_pairs,
-              "rank_e2c": rank_e2c, "rank_c2e": rank_c2e,
-              "norm_euc": norms_euc, "norm_cos": norms_cos}
-    return summary, per_galaxy, curves
+    return summary, per_galaxy
 
 
-def plot_histograms(curves, encoder, path):
-    fig, axes = plt.subplots(len(CENTERINGS), len(REPS), figsize=(9, 9),
-                             sharex=True, squeeze=False)
+def plot_matched_hist(matched, rep, centering, path):
+    """Cosine between the Euclid and COSMOS embeddings of each known pair, one
+    step histogram per encoder on shared bins so the two are comparable."""
+    fig, ax = plt.subplots(figsize=(6, 4))
     bins = np.linspace(-1, 1, 81)
-    for r, centering in enumerate(CENTERINGS):
-        for c, rep in enumerate(REPS):
-            ax = axes[r, c]
-            cv = curves[(encoder, rep, centering)]
-            for key, label, color in [("random", "Random pairs", BASELINE_COLOR),
-                                      ("matched", "Same galaxy", EUCLID_COLOR)]:
-                ax.hist(cv[key], bins=bins, density=True, histtype="stepfilled",
-                        color=color, alpha=0.25)
-                ax.hist(cv[key], bins=bins, density=True, histtype="step",
-                        color=color, linewidth=2, label=label)
-            ax.set_title(f"{rep} · {centering}", fontsize=11)
-            if r == len(CENTERINGS) - 1:
-                ax.set_xlabel("Cosine similarity (Euclid vs COSMOS)")
-            if c == 0:
-                ax.set_ylabel("Density")
-    axes[0, 0].legend(loc="upper left", fontsize=9)
-    fig.suptitle(f"Encoder {encoder}: same-galaxy vs random-pair cosine (test split)",
-                 fontsize=13)
-    fig.tight_layout()
-    fig.savefig(path, dpi=150, bbox_inches="tight")
-    plt.close(fig)
-    print(f"Saved {path}")
-
-
-def plot_ranks(curves, encoder, n_test, path):
-    fig, axes = plt.subplots(len(CENTERINGS), len(REPS), figsize=(9, 9),
-                             sharex=True, sharey=True, squeeze=False)
-    for r, centering in enumerate(CENTERINGS):
-        for c, rep in enumerate(REPS):
-            ax = axes[r, c]
-            cv = curves[(encoder, rep, centering)]
-            for key, label, color in [("rank_e2c", "Euclid → COSMOS", EUCLID_COLOR),
-                                      ("rank_c2e", "COSMOS → Euclid", COSMOS_COLOR)]:
-                k = np.sort(cv[key]) + 1  # top-k at which each galaxy is retrieved
-                ax.plot(k, np.arange(1, len(k) + 1) / len(k), color=color, label=label)
-            # chance: the counterpart is uniformly placed among n_test candidates
-            k_chance = np.arange(1, n_test + 1)
-            ax.plot(k_chance, k_chance / n_test, color=BASELINE_COLOR,
-                    linewidth=1, linestyle="--", label="Chance")
-            ax.set_xscale("log")
-            ax.set_ylim(0, 1)
-            ax.set_title(f"{rep} · {centering}", fontsize=11)
-            if r == len(CENTERINGS) - 1:
-                ax.set_xlabel("k")
-            if c == 0:
-                ax.set_ylabel("Top-k retrieval accuracy")
-    axes[0, 0].legend(loc="upper left", fontsize=9)
-    fig.suptitle(f"Encoder {encoder}: cross-survey retrieval by cosine (test split, "
-                 f"{n_test} candidates)", fontsize=13)
-    fig.tight_layout()
-    fig.savefig(path, dpi=150, bbox_inches="tight")
-    plt.close(fig)
-    print(f"Saved {path}")
-
-
-def plot_norms(curves, encoder, path):
-    """Raw (uncentered) embedding norms per survey: cosine discards these, so a
-    systematic gap here means cosine and Euclidean distance can disagree."""
-    fig, axes = plt.subplots(1, len(REPS), figsize=(9, 3.5), squeeze=False)
-    for c, rep in enumerate(REPS):
-        ax = axes[0, c]
-        cv = curves[(encoder, rep, "raw")]
-        both = np.concatenate([cv["norm_euc"], cv["norm_cos"]])
-        bins = np.linspace(both.min(), both.max(), 61)
-        for key, label, color in [("norm_euc", "Euclid", EUCLID_COLOR),
-                                  ("norm_cos", "COSMOS", COSMOS_COLOR)]:
-            ax.hist(cv[key], bins=bins, density=True, histtype="step",
-                    color=color, linewidth=2, label=label)
-        ax.set_title(rep, fontsize=11)
-        ax.set_xlabel("Embedding L2 norm")
-        if c == 0:
-            ax.set_ylabel("Density")
-    axes[0, 0].legend(loc="upper right", fontsize=9)
-    fig.suptitle(f"Encoder {encoder}: embedding norms (test split, uncentered)",
-                 fontsize=13)
+    for encoder in ENCODERS:
+        ax.hist(matched[encoder], bins=bins, histtype="step",
+                color=ENCODER_COLORS[encoder], linewidth=2,
+                label=f"Encoder {encoder}")
+    ax.set_xlabel("Cosine similarity (Euclid vs COSMOS, same galaxy)")
+    ax.set_ylabel("Number of pairs")
+    ax.set_title(f"Known pairs, test split ({rep} · {centering})", fontsize=12)
+    ax.legend(loc="upper left", fontsize=9)
     fig.tight_layout()
     fig.savefig(path, dpi=150, bbox_inches="tight")
     plt.close(fig)
@@ -256,6 +186,11 @@ def main():
                    help="Optional: the h5 the embeddings were exported from. Checks "
                         "that num_pairs matches the number of embedding rows.")
     p.add_argument("--out-dir",    default="cosine_similarity")
+    p.add_argument("--hist-rep",   choices=REPS, default="flat",
+                   help="Representation shown in the histogram (default: flat, "
+                        "what the Sinkhorn loss sees)")
+    p.add_argument("--hist-centering", choices=CENTERINGS, default="raw",
+                   help="Centering shown in the histogram (default: raw)")
     p.add_argument("--seed",       type=int, default=42)
     args = p.parse_args()
 
@@ -277,19 +212,17 @@ def main():
     rng = np.random.default_rng(args.seed)
     rows = []
     per_galaxy = {"dataset_idx": test}
-    curves = {}
     for encoder in ENCODERS:
         euclid = data[f"euclid_emb{encoder}"].astype(np.float64)
         cosmos = data[f"cosmos_emb{encoder}"].astype(np.float64)
         for rep in REPS:
             for centering in CENTERINGS:
-                summary, galaxy_cols, cv = analyse(euclid, cosmos, train, test,
-                                                   rep, centering, rng)
+                summary, galaxy_cols = analyse(euclid, cosmos, train, test,
+                                               rep, centering, rng)
                 rows.append({"encoder": encoder, "rep": rep, "centering": centering,
                              **summary})
                 for col, values in galaxy_cols.items():
                     per_galaxy[f"enc{encoder}_{rep}_{centering}_{col}"] = values
-                curves[(encoder, rep, centering)] = cv
                 print(f"  encoder {encoder} | {rep:6s} | {centering:10s} | "
                       f"matched {summary['matched_mean']:+.3f}  "
                       f"random {summary['random_mean']:+.3f}  "
@@ -305,13 +238,11 @@ def main():
     pd.DataFrame(per_galaxy).to_csv(galaxy_path, index=False, float_format="%.6f")
     print(f"Saved {galaxy_path}")
 
-    for encoder in ENCODERS:
-        plot_histograms(curves, encoder,
-                        os.path.join(args.out_dir, f"cosine_hist_encoder{encoder}.png"))
-        plot_ranks(curves, encoder, len(test),
-                   os.path.join(args.out_dir, f"retrieval_encoder{encoder}.png"))
-        plot_norms(curves, encoder,
-                   os.path.join(args.out_dir, f"norms_encoder{encoder}.png"))
+    rep, centering = args.hist_rep, args.hist_centering
+    matched = {encoder: per_galaxy[f"enc{encoder}_{rep}_{centering}_cos_matched"]
+               for encoder in ENCODERS}
+    plot_matched_hist(matched, rep, centering,
+                      os.path.join(args.out_dir, "cosine_hist_pairs.png"))
 
 
 if __name__ == "__main__":
