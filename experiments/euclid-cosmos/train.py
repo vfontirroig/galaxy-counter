@@ -247,7 +247,13 @@ class EuclidCosmosModel(ConditionalFlowMatchingModule):
 # CONFIG — edit before running
 # ---------------------------------------------------------------------------
 H5_PATH     = "/n03data/fontirro/data_files/euclid_cosmos_pairs_nir_h_f150w_v2.h5"
-CKPT_DIR    = "/n03data/fontirro/euclid-cosmos/checkpoints/euclid-cosmos-nir-h-f150w/test-1-phase1/v14"  # where to save checkpoints and logs
+
+# SEED drives everything random in training (weight init, shuffling, noise, t,
+# neighbour fallbacks). run_train.sh sets it per array task; 42 when run by hand.
+# SPLIT_SEED stays fixed so every seed trains and is tested on the same galaxies.
+SEED        = int(os.environ.get("SEED", 42))
+SPLIT_SEED  = 123
+CKPT_DIR    = f"/n03data/fontirro/euclid-cosmos/checkpoints/euclid-cosmos-nir-h-f150w/test-2-phase1/v1/seed_{SEED}"  # where to save checkpoints and logs
 
 BATCH_SIZE  = 64
 NUM_WORKERS = 16
@@ -258,7 +264,7 @@ IMAGE_SIZE  = 64      #Cutout spatial size
 LR          = 1e-4    #learning rate for AdamW optimizer
 
 N_GPUS      = 1       #set to number of GPUs on the node
-LAMBDA_GEO  = 0     #weight for the geometric loss
+LAMBDA_GEO  = 1     #weight for the geometric loss
 # ---------------------------------------------------------------------------
 
 
@@ -349,14 +355,14 @@ def main():
     torch.backends.cuda.matmul.allow_tf32 = True
     torch.backends.cudnn.allow_tf32 = True
     torch.backends.cudnn.benchmark = True
-    pl.seed_everything(42, workers=True)
+    pl.seed_everything(SEED, workers=True)
 
     dataset   = EuclidCosmosDataset(H5_PATH, bidirectional=True) #returns euclid (anchor), cosmos (input), metadata or cosmos (anchor), euclid (input), metadata depending on the index.
     n_total   = len(dataset)
     n_test    = int(n_total * TEST_RATIO)
     n_val     = int(n_total * VAL_RATIO)
     n_train   = n_total - n_val - n_test
-    generator = torch.Generator().manual_seed(123)
+    generator = torch.Generator().manual_seed(SPLIT_SEED)
     train_ds, val_ds, test_ds = random_split(dataset, [n_train, n_val, n_test], generator=generator)
 
     print(f"Dataset: {n_total} pairs → {n_train} train / {n_val} val / {n_test} test")
@@ -465,7 +471,7 @@ def main():
         precision="bf16-mixed",
         val_check_interval=1000,
         check_val_every_n_epoch=None,
-        callbacks=[best_checkpoint, periodic_checkpoint, early_stopping],
+        callbacks=[best_checkpoint, periodic_checkpoint],
         num_sanity_val_steps=2,
     )
 
