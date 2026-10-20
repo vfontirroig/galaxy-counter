@@ -22,4 +22,5 @@ python /n03data/fontirro/euclid-cosmos/galaxy-counter/experiments/euclid-cosmos/
     --embeddings "${CKPT_DIR}/embeddings/embeddings.npz" \
     --ckpt-dir   "${CKPT_DIR}" \
     --h5         "${H5_FILE}" \
+    --hist-centering global \
     --out-dir    "${OUT_DIR}/cosine_similarity"
