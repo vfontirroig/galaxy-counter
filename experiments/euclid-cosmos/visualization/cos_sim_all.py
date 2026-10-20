@@ -79,8 +79,7 @@ def plot_all(results, encoder, rep, centering, path):
     handles = [Line2D([], [], color=color_of[lam], linewidth=2,
                       label=f"λ = {lam:.1f} ({version})")
                for lam, version, _ in results]
-    ax.legend(handles=handles, title="λ_geo", fontsize=9,
-              loc="upper left", bbox_to_anchor=(1.01, 1.0))
+    ax.legend(handles=handles, title="Geometric weight", fontsize=9, loc="upper left")
 
     fig.tight_layout()
     fig.savefig(path, dpi=150, bbox_inches="tight")
