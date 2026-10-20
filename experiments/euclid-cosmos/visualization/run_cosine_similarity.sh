@@ -12,9 +12,9 @@ set -euo pipefail
 source /n03data/fontirro/.galaxy-counter-env/bin/activate
 
 # Must be the same CKPT_DIR and h5 the embeddings were exported with
-CKPT_DIR="/n03data/fontirro/euclid-cosmos/checkpoints/euclid-cosmos-nir-h-f150w/test-1-phase1/v14"
+CKPT_DIR="/n03data/fontirro/euclid-cosmos/checkpoints/euclid-cosmos-nir-h-f150w/test-1-phase1/v13"
 H5_FILE="/n03data/fontirro/data_files/euclid_cosmos_pairs_nir_h_f150w_v2.h5"
-OUT_DIR="/n03data/fontirro/euclid-cosmos/plots_model/euclid-cosmos-nir-h-f150w/test-1-phase1/v14/cosine_similarity"
+OUT_DIR="/n03data/fontirro/euclid-cosmos/plots_model/euclid-cosmos-nir-h-f150w/test-1-phase1/v13/cosine_similarity"
 
 mkdir -p "${OUT_DIR}"
 
