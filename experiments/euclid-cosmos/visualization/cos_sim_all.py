@@ -77,8 +77,9 @@ def plot_all(results, encoder, rep, centering, path):
     #             fontsize=12)
     # hist() legend entries are filled patches; lines match the step outlines
     handles = [Line2D([], [], color=color_of[lam], linewidth=2,
-                      label=f"λ = {lam:.1f} ({version})")
-               for lam, version, _ in results]
+                      # + 0.0 turns a rounded -0.00 into 0.00
+                      label=f"λ = {lam:.1f} (mean: {round(values.mean(), 2) + 0.0:.2f})")
+               for lam, _, values in results]
     ax.legend(handles=handles, title="Geometric weight", fontsize=9, loc="upper left")
 
     fig.tight_layout()
