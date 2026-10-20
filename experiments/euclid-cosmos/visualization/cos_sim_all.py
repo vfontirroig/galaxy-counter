@@ -8,8 +8,8 @@ split, and computes the matched cosine exactly as cosine_similarity.py does, so
 the values agree with its per_galaxy.csv. Versions whose embeddings have not been
 exported yet are skipped with a warning.
 
-All histograms are overlaid on one axis, one colour-blind-safe colour (and,
-past the eighth, a dashed line) per lambda_geo.
+All histograms are overlaid on one axis, one colour-blind-safe colour per
+lambda_geo.
 
 Usage:
     python experiments/euclid-cosmos/visualization/cos_sim_all.py \
@@ -41,13 +41,14 @@ plt.rcParams.update({
 VERSIONS = ['v14','v5','v6','v4','v7','v8','v9','v10','v11','v12','v13']
 LAMBDA_GEO = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
 
-# Okabe & Ito (2008) colour-blind-safe palette. Among the 8-colour palettes
-# checked it separates best under simulated protan/deutan/tritan vision when
-# every pair must be distinguishable, as overlaid lines require. The yellow is
-# faint on white, but any darker yellow becomes indistinguishable from the
-# orange for colour-blind readers, so it is kept and lines are drawn 2 px wide.
-OKABE_ITO = ["#000000", "#E69F00", "#56B4E9", "#009E73",
-             "#F0E442", "#0072B2", "#D55E00", "#CC79A7"]
+# One colour per lambda_geo, in LAMBDA_GEO order. Chosen by search so that every
+# pair stays distinguishable (OKLab Delta E >= 12, target 8) under normal vision
+# and simulated protan/deutan/tritan colour blindness (Machado et al. 2009), as
+# overlaid lines require. All clear 2:1 contrast on white so no line is faint.
+# The order puts the most different colours on neighbouring lambdas, whose
+# distributions overlap most (neighbours Delta E >= 24).
+LAMBDA_COLORS = ["#37cda0", "#2956c4", "#a94620", "#6880f8", "#463d7a", "#d76821",
+                 "#c1aaff", "#7c5d7b", "#ee9e10", "#7b2431", "#a1809f"]
 
 
 def matched_cosine(version_dir, encoder, rep, centering, seed):
@@ -61,37 +62,22 @@ def matched_cosine(version_dir, encoder, rep, centering, seed):
     return per_galaxy["cos_matched"]
 
 
-def lambda_styles():
-    """(colour, linestyle) per lambda_geo, fixed by the lambda value itself so
-    a skipped version never repaints the others.
-
-    Eight colours cannot be told apart beyond eight series, so lambdas past the
-    eighth reuse the palette from the start with a dashed line: every lambda
-    keeps a unique colour + style pair."""
-    styles = {}
-    for i, lam in enumerate(sorted(LAMBDA_GEO)):
-        color = OKABE_ITO[i % len(OKABE_ITO)]
-        styles[lam] = (color, "-" if i < len(OKABE_ITO) else "--")
-    return styles
-
-
 def plot_all(results, encoder, rep, centering, path):
     """Every lambda_geo overlaid on one axis, on shared bins."""
-    styles = lambda_styles()
+    # keyed by the lambda value, so a skipped version never repaints the others
+    color_of = dict(zip(LAMBDA_GEO, LAMBDA_COLORS))
 
     fig, ax = plt.subplots(figsize=(8, 4.5))
     bins = np.linspace(-1, 1, 81)
     for lam, _, values in results:
-        color, linestyle = styles[lam]
-        ax.hist(values, bins=bins, histtype="step", color=color,
-                linestyle=linestyle, linewidth=2)
+        ax.hist(values, bins=bins, histtype="step", color=color_of[lam], linewidth=2)
     ax.set_xlabel("Cosine similarity values")
     ax.set_ylabel("Number of pairs")
     #ax.set_title(f"Known pairs, test split · encoder {encoder} ({rep} · {centering})",
     #             fontsize=12)
-    # hist() legend entries are patches; lines show the dash pattern too
-    handles = [Line2D([], [], color=styles[lam][0], linestyle=styles[lam][1],
-                      linewidth=2, label=f"λ = {lam:.1f} ({version})")
+    # hist() legend entries are filled patches; lines match the step outlines
+    handles = [Line2D([], [], color=color_of[lam], linewidth=2,
+                      label=f"λ = {lam:.1f} ({version})")
                for lam, version, _ in results]
     ax.legend(handles=handles, title="λ_geo", fontsize=9,
               loc="upper left", bbox_to_anchor=(1.01, 1.0))
