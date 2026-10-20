@@ -50,6 +50,8 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}")
 
+    os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
+
     # --- Load model ---
     print(f"Loading checkpoint: {args.checkpoint}")
     model = EuclidCosmosModel.load_from_checkpoint(args.checkpoint, map_location=device)

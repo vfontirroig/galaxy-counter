@@ -10,6 +10,8 @@
 #SBATCH --partition=pscompl      # change to your GPU partition
 set -euo pipefail
 
+source /n03data/fontirro/.galaxy-counter-env/bin/activate
+
 CKPT_DIR="/n03data/fontirro/euclid-cosmos/checkpoints/euclid-cosmos-nir-h-f150w/test-1-phase1/v5"
 H5_FILE="/n03data/fontirro/data_files/euclid_cosmos_pairs_nir_h_f150w_v2.h5"
 OUT_DIR="/n03data/fontirro/euclid-cosmos/checkpoints/euclid-cosmos-nir-h-f150w/test-1-phase1/v5/embeddings"
