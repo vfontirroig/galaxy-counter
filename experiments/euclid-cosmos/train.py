@@ -253,7 +253,7 @@ H5_PATH     = "/n03data/fontirro/data_files/euclid_cosmos_pairs_nir_h_f150w_v2.h
 # SPLIT_SEED stays fixed so every seed trains and is tested on the same galaxies.
 SEED        = int(os.environ.get("SEED", 42))
 SPLIT_SEED  = 123
-CKPT_DIR    = f"/n03data/fontirro/euclid-cosmos/checkpoints/euclid-cosmos-nir-h-f150w/test-2-phase1/v1/seed_{SEED}"  # where to save checkpoints and logs
+CKPT_DIR    = f"/n03data/fontirro/euclid-cosmos/checkpoints/euclid-cosmos-nir-h-f150w/test-2-phase1/v2/seed_{SEED}"  # where to save checkpoints and logs
 
 BATCH_SIZE  = 64
 NUM_WORKERS = 16
@@ -264,7 +264,7 @@ IMAGE_SIZE  = 64      #Cutout spatial size
 LR          = 1e-4    #learning rate for AdamW optimizer
 
 N_GPUS      = 1       #set to number of GPUs on the node
-LAMBDA_GEO  = 1     #weight for the geometric loss
+LAMBDA_GEO  = 0     #weight for the geometric loss
 # ---------------------------------------------------------------------------
 
 
