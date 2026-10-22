@@ -1,34 +1,26 @@
 """
-FID and MSE of the mean generation over the Euclid x COSMOS test set.
+Per-galaxy MSE and pixel Fréchet distance of the mean generation over the
+Euclid x COSMOS test set.
 
 For every test galaxy, generates --n-samples cutouts from its input (the
 same-galaxy image in the other survey + the same-instrument neighbour), averages
 them, and compares that mean with the real target (anchor):
-  - MSE  per galaxy, mean generation vs target, in the normalised units of the
-         target survey.
-  - FID  between the distribution of the real targets and that of the mean
-         generations: Inception-v3 pool features (pytorch-fid weights). Also
-         bootstrapped over galaxies (--n-bootstrap) to show its spread.
-
-FID depends on the number of images (it is biased high at small N), and a
-bootstrap resample repeats galaxies, so it holds fewer distinct images than the
-full set: the bootstrap histogram sits above the full-set FID. Read its width
-as the uncertainty and the full-set FID (fid.csv, dashed line) as the value.
+  - MSE            pixel by pixel, mean generation vs target.
+  - pixel Fréchet  between the distribution of the target's pixel values and
+                   that of the mean generation's, each summarised as a Gaussian
+                   (mean mu, standard deviation sigma):
+                       (mu_target - mu_gen)^2 + (sigma_target - sigma_gen)^2
+                   This is the FID formula in one dimension, on raw pixel values
+                   instead of Inception features. It ignores where pixels are,
+                   so it measures brightness levels and contrast, not structure.
+Both are in the normalised units of the target survey.
 
 The test set is loaded bidirectionally, as in training: even h5 rows have a
-Euclid target (COSMOS input), odd rows a COSMOS target (Euclid input). Both
-directions go into the same target and generated sets.
+Euclid target (COSMOS input), odd rows a COSMOS target (Euclid input).
 
 Writes to --out-dir:
-  per_galaxy.csv     idx, anchor_survey, mse_mean_vs_target
-  fid.csv            n, fid, bootstrap mean/std, stretch limits
-  fid_bootstrap.csv  every bootstrap FID, so the histogram can be re-plotted
-  histograms.png     MSE per galaxy | bootstrap FID
-
-Inception weights: pytorch-fid downloads pt_inception-2015-12-05-6726825d.pth
-to ~/.cache/torch/hub/checkpoints the first time. Compute nodes without
-internet need it fetched once beforehand on a login node:
-    python -c "from pytorch_fid.inception import InceptionV3; InceptionV3()"
+  per_galaxy.csv  idx, anchor_survey, mse_mean_vs_target, pixel_frechet
+  histograms.png  per-galaxy MSE | per-galaxy pixel Fréchet distance
 
 Usage:
     python experiments/euclid-cosmos/visualization/fid_plot.py \
@@ -51,8 +43,6 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader, Subset
 from tqdm import tqdm
-from pytorch_fid.inception import InceptionV3
-from pytorch_fid.fid_score import calculate_frechet_distance
 
 _here = os.path.dirname(__file__)
 _experiment_dir = os.path.abspath(os.path.join(_here, ".."))
@@ -63,52 +53,48 @@ sys.path.insert(0, os.path.join(_repo_root, "src"))
 from dataset import EuclidCosmosDataset
 from train import EuclidCosmosModel, collate_fn
 
-# Stretch to [0, 1] before Inception, in percentiles of the real targets. The
-# same lo/hi is applied to real and generated images, since the stretch itself
-# changes the FID.
-STRETCH_PERCENTILES = (0.5, 99.5)
 
+def pixel_frechet(target, generated):
+    """Per-image Fréchet distance between Gaussians fitted to the pixel values.
 
-def inception_features(images, inception, lo, hi, device, batch_size):
-    """(N, 1, H, W) normalised cutouts -> (N, 2048) Inception pool features.
-
-    Linearly stretched to [0, 1] with lo/hi, then copied to 3 channels;
-    InceptionV3 resizes to 299x299 and rescales to [-1, 1] itself.
+    target, generated: (B, C, H, W) -> (B,)
     """
-    feats = []
-    with torch.no_grad():
-        for start in range(0, len(images), batch_size):
-            x = images[start:start + batch_size].to(device)
-            x = ((x - lo) / (hi - lo)).clamp(0, 1).repeat(1, 3, 1, 1)
-            feats.append(inception(x)[0].flatten(1).cpu())
-    return torch.cat(feats).double().numpy()
+    t, g = target.flatten(1), generated.flatten(1)
+    mu_t, mu_g = t.mean(dim=1), g.mean(dim=1)
+    sigma_t, sigma_g = t.std(dim=1, unbiased=False), g.std(dim=1, unbiased=False)
+    return (mu_t - mu_g) ** 2 + (sigma_t - sigma_g) ** 2
 
 
-def fid_from_features(real, gen):
-    mu_r, sigma_r = real.mean(axis=0), np.cov(real, rowvar=False)
-    mu_g, sigma_g = gen.mean(axis=0), np.cov(gen, rowvar=False)
-    return float(calculate_frechet_distance(mu_r, sigma_r, mu_g, sigma_g))
+def metric_hist(ax, values, xlabel, title):
+    """Histogram of a non-negative per-galaxy metric.
+
+    Log axis when the values span two orders of magnitude or more (a linear one
+    would squash the bulk into the first bins); linear otherwise, where log
+    tick labels would overlap.
+    """
+    positive = values[values > 0]
+    if positive.max() / positive.min() >= 100:
+        ax.hist(positive, bins=np.logspace(np.log10(positive.min()), np.log10(positive.max()), 40))
+        ax.set_xscale("log")
+        if len(positive) < len(values):
+            print(f"[WARN] {len(values) - len(positive)} galaxies with {xlabel} == 0 "
+                  f"are not shown on the log axis")
+    else:
+        ax.hist(values, bins=40)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel("Galaxies")
+    ax.set_title(title)
 
 
-def plot_histograms(per_galaxy, fid, fid_boot, n_samples, path):
-    fig, (ax_mse, ax_fid) = plt.subplots(1, 2, figsize=(12, 4.5))
-
-    # MSE is right-skewed over orders of magnitude: log-spaced bins on a log axis.
-    mse = per_galaxy["mse_mean_vs_target"]
-    mse_bins = np.logspace(np.log10(mse[mse > 0].min()), np.log10(mse.max()), 40)
-    ax_mse.hist(mse, bins=mse_bins)
-    ax_mse.set_xscale("log")
-    ax_mse.set_xlabel("MSE, mean generation vs target (normalised units)")
-    ax_mse.set_ylabel("Galaxies")
-    ax_mse.set_title(f"Per-galaxy MSE (mean of {n_samples} generations, N={len(mse)})")
-
-    ax_fid.hist(fid_boot["fid"], bins=20, label=f"{len(fid_boot)} bootstrap resamples")
-    ax_fid.axvline(fid, color="k", linestyle="--", label=f"Full test set: {fid:.2f}")
-    ax_fid.set_xlabel("FID, targets vs mean generations (Inception-v3)")
-    ax_fid.set_ylabel("Bootstrap resamples")
-    ax_fid.set_title("FID")
-    ax_fid.legend()
-
+def plot_histograms(per_galaxy, n_samples, path):
+    fig, (ax_mse, ax_fd) = plt.subplots(1, 2, figsize=(12, 4.5))
+    n = len(per_galaxy)
+    metric_hist(ax_mse, per_galaxy["mse_mean_vs_target"],
+             "MSE, mean generation vs target (normalised units)",
+             f"Per-galaxy MSE (mean of {n_samples} generations, N={n})")
+    metric_hist(ax_fd, per_galaxy["pixel_frechet"],
+             "Pixel Fréchet distance, mean generation vs target",
+             f"Per-galaxy pixel Fréchet distance (N={n})")
     plt.tight_layout()
     plt.savefig(path, dpi=150, bbox_inches="tight")
     plt.close()
@@ -122,11 +108,10 @@ def main():
     p.add_argument("--out-dir",     required=True)
     p.add_argument("--n-samples",   type=int, default=3,   help="Generations per input, averaged into the mean")
     p.add_argument("--num-steps",   type=int, default=100, help="ODE integration steps")
-    p.add_argument("--n-bootstrap", type=int, default=100, help="Bootstrap resamples of the FID")
     p.add_argument("--batch-size",  type=int, default=64)
     p.add_argument("--num-workers", type=int, default=4)
     p.add_argument("--seed",        type=int, default=42,
-                   help="Fixes the neighbour fallbacks, the sampling noise and the bootstrap, "
+                   help="Fixes the neighbour fallbacks and the sampling noise, "
                         "so reruns reproduce the same metrics")
     args = p.parse_args()
     pl.seed_everything(args.seed, workers=True)
@@ -156,7 +141,7 @@ def main():
     print(f"Test set: {len(test_indices)} galaxies")
 
     # --- Generate: mean of n_samples draws per input ---
-    rows, targets, generated = [], [], []
+    rows = []
     with torch.no_grad():
         for anchor, cond, sameins, masks, metadata in tqdm(loader, desc="Generating"):
             anchor  = anchor.to(device)
@@ -177,53 +162,21 @@ def main():
             ]).mean(dim=0)  # (B, 1, H, W)
 
             mse = ((mean_generation - anchor) ** 2).mean(dim=(1, 2, 3)).cpu()
-            targets.append(anchor.cpu())
-            generated.append(mean_generation.cpu())
+            fd  = pixel_frechet(anchor, mean_generation).cpu()
             for i, m in enumerate(metadata):
                 rows.append({"idx": m["idx"], "anchor_survey": m["anchor_survey"],
-                             "mse_mean_vs_target": mse[i].item()})
+                             "mse_mean_vs_target": mse[i].item(),
+                             "pixel_frechet": fd[i].item()})
 
     per_galaxy = pd.DataFrame(rows)
     per_galaxy.to_csv(os.path.join(args.out_dir, "per_galaxy.csv"), index=False, float_format="%.6f")
 
-    # --- FID: target distribution vs mean-generation distribution ---
-    real = torch.cat(targets)
-    gen  = torch.cat(generated)
-    n = len(real)
-    lo, hi = np.percentile(real.numpy(), STRETCH_PERCENTILES)
+    print(f"\n=== Test Results (mean of {args.n_samples} generations, N = {len(per_galaxy)}) ===")
+    for col, label in [("mse_mean_vs_target", "MSE"), ("pixel_frechet", "Pixel Fréchet")]:
+        v = per_galaxy[col]
+        print(f"{label:<14}: mean {v.mean():.6f}  median {v.median():.6f}  std {v.std():.6f}")
 
-    inception = InceptionV3([InceptionV3.BLOCK_INDEX_BY_DIM[2048]]).to(device).eval()
-    real_feats = inception_features(real, inception, lo, hi, device, args.batch_size)
-    gen_feats  = inception_features(gen,  inception, lo, hi, device, args.batch_size)
-    fid = fid_from_features(real_feats, gen_feats)
-
-    # Paired bootstrap: each resample draws galaxies, keeping a galaxy's real
-    # and generated images together.
-    rng = np.random.default_rng(args.seed)
-    boot_rows = []
-    for b in tqdm(range(args.n_bootstrap), desc="Bootstrap FID"):
-        idx = rng.integers(0, n, n)
-        boot_rows.append({"replicate": b, "fid": fid_from_features(real_feats[idx], gen_feats[idx])})
-    fid_boot = pd.DataFrame(boot_rows)
-
-    pd.DataFrame([{"n": n, "fid": fid,
-                   "fid_bootstrap_mean": fid_boot["fid"].mean(),
-                   "fid_bootstrap_std": fid_boot["fid"].std(),
-                   "stretch_lo": lo, "stretch_hi": hi}]).to_csv(
-        os.path.join(args.out_dir, "fid.csv"), index=False, float_format="%.6f")
-    fid_boot.to_csv(os.path.join(args.out_dir, "fid_bootstrap.csv"), index=False, float_format="%.6f")
-
-    if n < 2048:
-        print(f"[WARN] {n} galaxies < 2048 feature dims, so the covariances are "
-              f"rank-deficient and this FID is biased high. Compare FIDs only at equal N.")
-
-    mse = per_galaxy["mse_mean_vs_target"]
-    print(f"\n=== Test Results (mean of {args.n_samples} generations, N = {n}) ===")
-    print(f"MSE : mean {mse.mean():.6f}  median {mse.median():.6f}  std {mse.std():.6f}")
-    print(f"FID : {fid:.3f}  (bootstrap {fid_boot['fid'].mean():.3f} +/- {fid_boot['fid'].std():.3f})")
-
-    plot_histograms(per_galaxy, fid, fid_boot, args.n_samples,
-                    os.path.join(args.out_dir, "histograms.png"))
+    plot_histograms(per_galaxy, args.n_samples, os.path.join(args.out_dir, "histograms.png"))
     print(f"Results saved to: {args.out_dir}")
 
 
