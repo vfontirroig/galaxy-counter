@@ -13,7 +13,7 @@ set -euo pipefail
 source /n03data/fontirro/.galaxy-counter-env/bin/activate
 
 CKPT_DIR="/n03data/fontirro/euclid-cosmos/checkpoints/euclid-cosmos-nir-h-f150w/test-1-phase1/v13"
-OUT_DIR="/n03data/fontirro/euclid-cosmos/plots_model/euclid-cosmos-nir-h-f150w/test-1-phase1/v13/fid"
+OUT_DIR="/n03data/fontirro/euclid-cosmos/plots_model/euclid-cosmos-nir-h-f150w/test-1-phase1/v13/fid_v2"
 
 python /n03data/fontirro/euclid-cosmos/galaxy-counter/experiments/euclid-cosmos/visualization/fid_plot.py \
     --checkpoint  "${CKPT_DIR}/best-epoch=75-step=92000.ckpt" \
