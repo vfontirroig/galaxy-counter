@@ -797,6 +797,14 @@ class ConditionalFlowMatchingModule(pl.LightningModule):
         plt.close(fig_orig)
         plt.close(fig_row)
 
+        self._log_val_mse()
+
+    def _log_val_mse(self) -> None:
+        """Log the val/mse* metrics on the batch cached in validation_step.
+
+        Kept separate from on_validation_epoch_end so subclasses that replace
+        the W&B plotting there can still log these metrics.
+        """
         # Compute MSE metric (64x64 center = "MSE", 32x32 center = "MSE 32")
         if hasattr(self, '_val_mse_target_batch') and hasattr(self, '_val_mse_samegal_batch') and hasattr(self, '_val_mse_sameins_batch'):
             mse_start_time = time.time()
@@ -835,22 +843,6 @@ class ConditionalFlowMatchingModule(pl.LightningModule):
                 self.log(f"val/mse_{self.survey_a}", mse_hsc, sync_dist=True)
             if mse_legacy is not None:
                 self.log(f"val/mse_{self.survey_b}", mse_legacy, sync_dist=True)
-
-        # Generate UMAP visualization if we collected enough batches
-        if (hasattr(self, '_umap_hsc_batches') and hasattr(self, '_umap_legacy_batches') and
-            len(self._umap_hsc_batches) > 0 and len(self._umap_legacy_batches) > 0):
-            try:
-                # Concatenate all collected batches
-                hsc_mega_batch = torch.cat(self._umap_hsc_batches, dim=0).to(self.device)
-                legacy_mega_batch = torch.cat(self._umap_legacy_batches, dim=0).to(self.device)
-
-                # Call plot_latent_space
-                umap_path = self.plot_latent_space(hsc_mega_batch, legacy_mega_batch)
-                print(f"[UMAP] Visualization saved to {umap_path}")
-            except Exception as e:
-                print(f"[UMAP] Error generating UMAP visualization: {e}")
-                import traceback
-                traceback.print_exc()
 
     def configure_optimizers(self):
         optimizer = AdamW(self.parameters(), lr=self.lr)

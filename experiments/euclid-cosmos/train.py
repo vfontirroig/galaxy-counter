@@ -159,6 +159,10 @@ class EuclidCosmosModel(ConditionalFlowMatchingModule):
         return super().validation_step(batch, batch_idx)
 
     def on_validation_epoch_end(self) -> None:
+        # Replaces the base hook (whose W&B logging does not apply to the
+        # CSVLogger), so the val/mse* metrics have to be logged explicitly.
+        self._log_val_mse()
+
         if self._fixed_val_batch is None or self.sample_dir is None:
             return
 

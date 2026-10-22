@@ -1,12 +1,16 @@
 """
 Test the trained Euclid x COSMOS flow-matching model on the held-out test set.
 
-Loads the test indices saved by train.py, generates images, and reports MSE.
+Loads the test indices saved by train.py, generates --n-samples independent
+images per input (same conditioning, different noise), averages them, and
+reports MSE of that mean against the target and against the input.
 Figure columns depend on direction:
   cosmos-to-euclid:
-      [COSMOS input | Generated Euclid | Real Euclid | Residual]
+      [COSMOS input | Generated #1..N | Mean | Real Euclid | Residual (Mean - Real)]
   euclid-to-cosmos:
-      [Euclid input | Generated COSMOS | Real COSMOS | Residual]
+      [Euclid input | Generated #1..N | Mean | Real COSMOS | Residual (Mean - Real)]
+
+Per-galaxy metrics are written to --metrics (default: metrics.csv next to --out).
 
 Usage:
     python experiments/euclid-cosmos/testing.py \
@@ -22,6 +26,7 @@ import sys
 import argparse
 from functools import partial
 import numpy as np
+import pandas as pd
 import torch
 import matplotlib
 matplotlib.use("Agg")
@@ -51,6 +56,8 @@ def main():
     p.add_argument("--h5",         required=True)
     p.add_argument("--indices",    required=True, help="test_indices.npy saved by train.py")
     p.add_argument("--out",        default="test_results.png")
+    p.add_argument("--metrics",    default=None,
+                   help="Per-galaxy metrics CSV (default: metrics.csv in the --out directory)")
     p.add_argument("--direction",  default="cosmos-to-euclid",
                    choices=["cosmos-to-euclid", "euclid-to-cosmos"],
                    help="cosmos-to-euclid: COSMOS input, generate Euclid"
@@ -58,6 +65,7 @@ def main():
     p.add_argument("--n-plot",     type=int, default=8,   help="Galaxy rows to show in figure")
     p.add_argument("--batch-size", type=int, default=64)
     p.add_argument("--num-steps",  type=int, default=100, help="ODE integration steps")
+    p.add_argument("--n-samples",  type=int, default=3,   help="Generations per input, averaged into the mean")
     p.add_argument("--num-workers",type=int, default=4)
     args = p.parse_args()
 
@@ -104,8 +112,8 @@ def main():
     n_pool = sameins_pool.shape[0] #number of same-instrument galaxies.
 
     # --- Run inference over the full test set ---
-    all_mse = []
-    plot_input, plot_generated, plot_target, plot_metadata = [], [], [], []
+    rows = []
+    plot_input, plot_generated, plot_mean, plot_target, plot_metadata = [], [], [], [], []
 
     print("Running inference...")
     offset = 0
@@ -130,42 +138,71 @@ def main():
                 rand_local = torch.randint(0, n_pool - 1, (B,))
                 rand_idx   = rand_local + (rand_local >= row_pos)
                 sameins    = sameins_pool[rand_idx].unsqueeze(1).to(device)
+                sameins_ids = test_indices[rand_idx.numpy()].tolist()  # HDF5 rows of the picked neighbours
             else:
                 sameins = anchor.unsqueeze(1)
+                sameins_ids = [m["idx"] for m in metadata]
             offset += B
 
-            generated = model.sample(
-                cond_image_samegal=cond,
-                cond_image_sameins=sameins,
-                masks=masks,
-                num_steps=args.num_steps,
-            )
+            # Same conditioning (cond + sameins) for every draw, so the only
+            # difference between them is the sampling noise; averaging them
+            # cancels that scatter.
+            generations = torch.stack([
+                model.sample(
+                    cond_image_samegal=cond,
+                    cond_image_sameins=sameins,
+                    masks=masks,
+                    num_steps=args.num_steps,
+                )
+                for _ in range(args.n_samples)
+            ])  # (n_samples, B, 1, H, W)
+            mean_generation = generations.mean(dim=0)  # (B, 1, H, W)
 
-            mse = ((generated - anchor) ** 2).mean(dim=(1, 2, 3))
-            all_mse.append(mse.cpu())
+            mse_target = ((mean_generation - anchor) ** 2).mean(dim=(1, 2, 3)).cpu()
+            mse_input  = ((mean_generation - cond) ** 2).mean(dim=(1, 2, 3)).cpu()
+            for i, m in enumerate(metadata):
+                rows.append({
+                    "idx": m["idx"],
+                    "direction": args.direction,
+                    "mse_mean_vs_target": mse_target[i].item(),
+                    "mse_mean_vs_input": mse_input[i].item(),
+                })
 
             if batch_idx == 0:
                 plot_input     = cond.cpu()
-                plot_generated = generated.cpu()
+                plot_sameins   = sameins[:, 0].cpu()
+                plot_sameins_ids = sameins_ids
+                plot_generated = generations.cpu()
+                plot_mean      = mean_generation.cpu()
                 plot_target    = anchor.cpu()
                 plot_metadata  = metadata
 
-    all_mse = torch.cat(all_mse)
-    print(f"\n=== Test Results ({args.direction}) ===")
-    print(f"N test galaxies : {len(all_mse)}")
-    print(f"Mean MSE        : {all_mse.mean():.6f}")
-    print(f"Median MSE      : {all_mse.median():.6f}")
-    print(f"Std MSE         : {all_mse.std():.6f}")
+    df = pd.DataFrame(rows)
+    metrics_path = args.metrics or os.path.join(os.path.dirname(os.path.abspath(args.out)), "metrics.csv")
+    df.to_csv(metrics_path, index=False, float_format="%.6f")
+
+    print(f"\n=== Test Results ({args.direction}, mean of {args.n_samples} generations) ===")
+    print(f"N test galaxies : {len(df)}")
+    for col, label in [("mse_mean_vs_target", "vs target"), ("mse_mean_vs_input", "vs input")]:
+        print(f"MSE {label:<10}: mean {df[col].mean():.6f}  "
+              f"median {df[col].median():.6f}  std {df[col].std():.6f}")
+    print(f"Metrics saved: {metrics_path}")
 
     # --- Figure ---
     if args.direction == "cosmos-to-euclid":
-        col_titles = ["COSMOS input", "Generated Euclid", "Real Euclid", "Residual (Gen - Real)"]
+        input_label, real_label = "COSMOS input", "Real Euclid"
     else:
-        col_titles = ["Euclid input", "Generated COSMOS", "Real COSMOS", "Residual (Gen - Real)"]
+        input_label, real_label = "Euclid input", "Real COSMOS"
+    col_titles = (
+        [input_label, "Same-instrument input"]
+        + [f"Generated #{k + 1}" for k in range(args.n_samples)]
+        + [f"Mean of {args.n_samples}", real_label, "Residual (Mean - Real)"]
+    )
+    n_cols = len(col_titles)
 
     n = min(args.n_plot, len(plot_input))
     ids = [m["idx"] for m in plot_metadata[:n]]
-    fig, axes = plt.subplots(n, 4, figsize=(9, 2.5 * n))
+    fig, axes = plt.subplots(n, n_cols, figsize=(2.25 * n_cols, 2.5 * n))
     if n == 1:
         axes = axes[None, :]
 
@@ -174,21 +211,28 @@ def main():
 
     for i in range(n):
         show_image(axes[i, 0], plot_input[i])
-        show_image(axes[i, 1], plot_generated[i])
-        show_image(axes[i, 2], plot_target[i])
+        show_image(axes[i, 1], plot_sameins[i])
+        for k in range(args.n_samples):
+            show_image(axes[i, 2 + k], plot_generated[k, i])
+        show_image(axes[i, -3], plot_mean[i])
+        show_image(axes[i, -2], plot_target[i])
 
-        residual = (plot_generated[i] - plot_target[i]).squeeze().float().numpy()
+        residual = (plot_mean[i] - plot_target[i]).squeeze().float().numpy()
         #vmax = np.abs(residual).max()
-        im = axes[i, 3].imshow(residual, cmap="coolwarm")
-        axes[i, 3].axis("off")
-        fig.colorbar(im, ax=axes[i, 3], fraction=0.046, pad=0.04)
+        im = axes[i, -1].imshow(residual, cmap="coolwarm")
+        axes[i, -1].axis("off")
+        fig.colorbar(im, ax=axes[i, -1], fraction=0.046, pad=0.04)
 
-        axes[i, 0].text(0.02, 0.98, f"idx={ids[i]}", fontsize=18,
+        axes[i, 0].text(0.02, 0.98, f"idx={ids[i]}", fontsize=16,
                         ha="left", va="top", color="magenta",
                         transform=axes[i, 0].transAxes)
+        axes[i, 1].text(0.02, 0.98, f"idx={plot_sameins_ids[i]}", fontsize=16,
+                        ha="left", va="top", color="magenta",
+                        transform=axes[i, 1].transAxes)
 
     fig.suptitle(
-        f"Test set ({args.direction})  |  Mean MSE = {all_mse.mean():.5f}  |  N = {len(all_mse)}",
+        f"Test set ({args.direction})  |  Mean MSE (mean vs target) = {df['mse_mean_vs_target'].mean():.5f}"
+        f"  |  N = {len(df)}",
         fontsize=18, y=0.98,
     )
     plt.tight_layout(rect=[0, 0, 1, 0.99])
