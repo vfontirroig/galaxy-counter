@@ -12,14 +12,15 @@ set -euo pipefail
 
 source /n03data/fontirro/.galaxy-counter-env/bin/activate
 
-CKPT_DIR="/n03data/fontirro/euclid-cosmos/checkpoints/euclid-cosmos-vis-f150w/test-5-phase1/v2"
-PLOT_DIR="/n03data/fontirro/euclid-cosmos/plots_model/euclid-cosmos-vis-f150w/test-5-phase1"
+CKPT_DIR="/n03data/fontirro/euclid-cosmos/checkpoints/euclid-cosmos-nir-h-f150w/test-1-phase1/v13"
+PLOT_DIR="/n03data/fontirro/euclid-cosmos/plots_model/euclid-cosmos-nir-h-f150w/test-1-phase1/v13/test"
 
 python /n03data/fontirro/euclid-cosmos/galaxy-counter/experiments/euclid-cosmos/testing.py \
-    --checkpoint "${CKPT_DIR}/best-epoch=164-step=140000.ckpt" \
-    --h5         "/n03data/fontirro/data_files/euclid_cosmos_pairs_vis_f150w_v2.h5" \
+    --checkpoint "${CKPT_DIR}/best-epoch=75-step=92000.ckpt" \
+    --h5         "/n03data/fontirro/data_files/euclid_cosmos_pairs_nir_h_f150w_v2.h5" \
     --indices    "${CKPT_DIR}/test_indices.npy" \
     --out        "${PLOT_DIR}/test_results_cos_euc.png" \
     --n-plot     5 \
     --num-steps  100 \
-    --direction "cosmos-to-euclid"
+    --direction "cosmos-to-euclid" \
+    --metrics "${PLOT_DIR}/metrics_cos_euc.csv"

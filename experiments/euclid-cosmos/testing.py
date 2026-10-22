@@ -28,6 +28,7 @@ from functools import partial
 import numpy as np
 import pandas as pd
 import torch
+import pytorch_lightning as pl
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -66,8 +67,18 @@ def main():
     p.add_argument("--batch-size", type=int, default=64)
     p.add_argument("--num-steps",  type=int, default=100, help="ODE integration steps")
     p.add_argument("--n-samples",  type=int, default=3,   help="Generations per input, averaged into the mean")
+    p.add_argument("--seed",       type=int, default=42,
+                   help="Fixes the same-instrument neighbour picks and the sampling noise, "
+                        "so reruns reproduce the same figure and metrics")
     p.add_argument("--num-workers",type=int, default=4)
     args = p.parse_args()
+    pl.seed_everything(args.seed, workers=True)
+
+    # Created up front: the figure and CSV are only written after inference
+    # over the whole test set, so a missing directory would lose that run.
+    metrics_path = args.metrics or os.path.join(os.path.dirname(os.path.abspath(args.out)), "metrics.csv")
+    os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
+    os.makedirs(os.path.dirname(os.path.abspath(metrics_path)), exist_ok=True)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}")
@@ -178,7 +189,6 @@ def main():
                 plot_metadata  = metadata
 
     df = pd.DataFrame(rows)
-    metrics_path = args.metrics or os.path.join(os.path.dirname(os.path.abspath(args.out)), "metrics.csv")
     df.to_csv(metrics_path, index=False, float_format="%.6f")
 
     print(f"\n=== Test Results ({args.direction}, mean of {args.n_samples} generations) ===")
