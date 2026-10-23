@@ -113,8 +113,14 @@ def main():
     p.add_argument("--seed",        type=int, default=42,
                    help="Fixes the neighbour fallbacks and the sampling noise, "
                         "so reruns reproduce the same metrics")
+    p.add_argument("--precision",   default="bf16-mixed", choices=["bf16-mixed", "32"],
+                   help="Sampling precision. bf16-mixed matches training (train.py's "
+                        "Trainer precision, which also covers its validation sampling) and "
+                        "is several times faster; 32 is full fp32.")
     args = p.parse_args()
     pl.seed_everything(args.seed, workers=True)
+    torch.backends.cuda.matmul.allow_tf32 = True
+    torch.backends.cudnn.allow_tf32 = True
 
     # Created up front: everything is written after the full generation pass.
     os.makedirs(args.out_dir, exist_ok=True)
@@ -142,7 +148,9 @@ def main():
 
     # --- Generate: mean of n_samples draws per input ---
     rows = []
-    with torch.no_grad():
+    autocast = torch.autocast(device_type=device.type, dtype=torch.bfloat16,
+                              enabled=args.precision == "bf16-mixed")
+    with torch.no_grad(), autocast:
         for anchor, cond, sameins, masks, metadata in tqdm(loader, desc="Generating"):
             anchor  = anchor.to(device)
             cond    = cond.to(device)
@@ -159,7 +167,7 @@ def main():
                     num_steps=args.num_steps,
                 )
                 for _ in range(args.n_samples)
-            ]).mean(dim=0)  # (B, 1, H, W)
+            ]).float().mean(dim=0)  # (B, 1, H, W); metrics in fp32 whatever the precision
 
             mse = ((mean_generation - anchor) ** 2).mean(dim=(1, 2, 3)).cpu()
             fd  = pixel_frechet(anchor, mean_generation).cpu()
