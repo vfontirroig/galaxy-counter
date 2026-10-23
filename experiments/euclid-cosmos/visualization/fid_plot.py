@@ -13,14 +13,20 @@ them, and compares that mean with the real target (anchor):
                    This is the FID formula in one dimension, on raw pixel values
                    instead of Inception features. It ignores where pixels are,
                    so it measures brightness levels and contrast, not structure.
-Both are in the normalised units of the target survey.
+Both are in the normalised units of the target survey, which differ between
+Euclid and COSMOS. So also:
+  - normalised MSE  MSE / variance of the target image's pixels = 1 - R^2: the
+                    fraction of the target's pixel variance the mean generation
+                    leaves unexplained. Unitless, so comparable across surveys.
 
 The test set is loaded bidirectionally, as in training: even h5 rows have a
 Euclid target (COSMOS input), odd rows a COSMOS target (Euclid input).
 
 Writes to --out-dir:
-  per_galaxy.csv  idx, anchor_survey, mse_mean_vs_target, pixel_frechet
-  histograms.png  per-galaxy MSE | per-galaxy pixel Fréchet distance
+  per_galaxy.csv      idx, anchor_survey, mse_mean_vs_target, pixel_frechet,
+                      nmse_mean_vs_target
+  histograms.png      per-galaxy MSE | per-galaxy pixel Fréchet distance
+  histogram_nmse.png  per-galaxy normalised MSE
 
 Usage:
     python experiments/euclid-cosmos/visualization/fid_plot.py \
@@ -65,6 +71,14 @@ def pixel_frechet(target, generated):
     return (mu_t - mu_g) ** 2 + (sigma_t - sigma_g) ** 2
 
 
+def target_variance(target):
+    """Per-image pixel variance, (B, C, H, W) -> (B,).
+
+    Population variance (unbiased=False), so MSE / variance is exactly 1 - R^2.
+    """
+    return target.flatten(1).var(dim=1, unbiased=False)
+
+
 def metric_hist(ax, values, xlabel, title):
     """Histogram of a non-negative per-galaxy metric.
 
@@ -72,6 +86,7 @@ def metric_hist(ax, values, xlabel, title):
     would squash the bulk into the first bins); linear otherwise, where log
     tick labels would overlap.
     """
+    values = values[np.isfinite(values)]
     positive = values[values > 0]
     if positive.max() / positive.min() >= 100:
         ax.hist(positive, bins=np.logspace(np.log10(positive.min()), np.log10(positive.max()), 40))
@@ -95,6 +110,16 @@ def plot_histograms(per_galaxy, n_samples, path):
     metric_hist(ax_fd, per_galaxy["pixel_frechet"],
              "Pixel Fréchet distance, mean generation vs target",
              f"Per-galaxy pixel Fréchet distance (N={n})")
+    plt.tight_layout()
+    plt.savefig(path, dpi=150, bbox_inches="tight")
+    plt.close()
+
+
+def plot_nmse_histogram(per_galaxy, path):
+    fig, ax = plt.subplots(figsize=(6, 4.5))
+    metric_hist(ax, per_galaxy["nmse_mean_vs_target"],
+                "MSE / variance of the target (1 - R²)",
+                f"Per-galaxy normalised MSE (N={len(per_galaxy)})")
     plt.tight_layout()
     plt.savefig(path, dpi=150, bbox_inches="tight")
     plt.close()
@@ -171,20 +196,25 @@ def main():
 
             mse = ((mean_generation - anchor) ** 2).mean(dim=(1, 2, 3)).cpu()
             fd  = pixel_frechet(anchor, mean_generation).cpu()
+            var_t = target_variance(anchor).cpu()
             for i, m in enumerate(metadata):
                 rows.append({"idx": m["idx"], "anchor_survey": m["anchor_survey"],
                              "mse_mean_vs_target": mse[i].item(),
-                             "pixel_frechet": fd[i].item()})
+                             "pixel_frechet": fd[i].item(),
+                             "nmse_mean_vs_target": (mse[i] / var_t[i]).item()})
 
     per_galaxy = pd.DataFrame(rows)
-    per_galaxy.to_csv(os.path.join(args.out_dir, "per_galaxy.csv"), index=False, float_format="%.6f")
+    # %.6g (significant digits), not %.6f: pixel_frechet goes down to ~1e-5.
+    per_galaxy.to_csv(os.path.join(args.out_dir, "per_galaxy.csv"), index=False, float_format="%.6g")
 
     print(f"\n=== Test Results (mean of {args.n_samples} generations, N = {len(per_galaxy)}) ===")
-    for col, label in [("mse_mean_vs_target", "MSE"), ("pixel_frechet", "Pixel Fréchet")]:
+    for col, label in [("mse_mean_vs_target", "MSE"), ("pixel_frechet", "Pixel Fréchet"),
+                       ("nmse_mean_vs_target", "Normalised MSE")]:
         v = per_galaxy[col]
-        print(f"{label:<14}: mean {v.mean():.6f}  median {v.median():.6f}  std {v.std():.6f}")
+        print(f"{label:<14}: mean {v.mean():.6g}  median {v.median():.6g}  std {v.std():.6g}")
 
     plot_histograms(per_galaxy, args.n_samples, os.path.join(args.out_dir, "histograms.png"))
+    plot_nmse_histogram(per_galaxy, os.path.join(args.out_dir, "histogram_nmse.png"))
     print(f"Results saved to: {args.out_dir}")
 
 
