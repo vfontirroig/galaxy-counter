@@ -24,6 +24,7 @@ Usage:
 import os
 import sys
 import argparse
+from functools import partial
 import numpy as np
 import pandas as pd
 import torch
@@ -39,8 +40,27 @@ _repo_root = os.path.abspath(os.path.join(_here, "..", ".."))
 sys.path.insert(0, _here)
 sys.path.insert(0, os.path.join(_repo_root, "src"))
 
-from dataset import EuclidCosmosDataset, NORM_DICT, collate_pairs
-from train import EuclidCosmosModel
+from dataset import EuclidCosmosDataset
+from train import EuclidCosmosModel, collate_fn
+
+
+class OneDirectionDataset(EuclidCosmosDataset):
+    """Every row in the same direction, whatever its index parity.
+
+    Returns (anchor, cond, metadata) with metadata["anchor_survey"] set to the
+    generated survey, so train.py's collate_fn picks the precomputed sky
+    neighbour from that survey, as in training and fid_plot.py.
+    """
+
+    def __init__(self, hdf5_path, anchor_survey):
+        super().__init__(hdf5_path)
+        self.anchor_survey = anchor_survey
+
+    def __getitem__(self, idx):
+        euc, cos, metadata = super().__getitem__(idx)
+        if self.anchor_survey == "cosmos":
+            return cos, euc, {"idx": idx, "anchor_survey": "cosmos"}
+        return euc, cos, metadata
 
 
 def show_image(ax, img_tensor, title=None):
@@ -68,7 +88,7 @@ def main():
     p.add_argument("--num-steps",  type=int, default=100, help="ODE integration steps")
     p.add_argument("--n-samples",  type=int, default=3,   help="Generations per input, averaged into the mean")
     p.add_argument("--seed",       type=int, default=42,
-                   help="Fixes the same-instrument neighbour picks and the sampling noise, "
+                   help="Fixes the neighbour fallbacks and the sampling noise, "
                         "so reruns reproduce the same figure and metrics")
     p.add_argument("--num-workers",type=int, default=4)
     p.add_argument("--precision",  default="bf16-mixed", choices=["bf16-mixed", "32"],
@@ -105,75 +125,31 @@ def main():
     # --- Build test dataset from saved indices ---
     test_indices = np.load(args.indices)
     print(f"Test set: {len(test_indices)} galaxies")
-    dataset     = EuclidCosmosDataset(args.h5)
+    # sameins is the precomputed same-instrument sky neighbour, read by
+    # train.py's collate_fn exactly as in training and fid_plot.py.
+    anchor_survey = "euclid" if args.direction == "cosmos-to-euclid" else "cosmos"
+    dataset     = OneDirectionDataset(args.h5, anchor_survey)
     test_subset = Subset(dataset, test_indices.tolist())
-    # collate_pairs, not train.py's collate_fn: the sameins images collate_fn
-    # reads from the HDF5 would be thrown away here (replaced by the pool
-    # below), so it was one wasted image read per galaxy.
     loader      = DataLoader(
         test_subset,
         batch_size=args.batch_size,
         shuffle=False,
         num_workers=args.num_workers,
-        collate_fn=collate_pairs,
+        collate_fn=partial(collate_fn, dataset=dataset),
     )
-
-    # --- Build a same-instrument neighbor pool from the whole test set ---
-    # Sampling within-batch (as train.py's collate_fn does) breaks when a
-    # batch has only one row (e.g. the last, leftover batch): there'd be no
-    # "different" galaxy to pick, and the anchor would leak into its own
-    # conditioning. Sampling from the full test set avoids that entirely.
-    # One HDF5 read of the anchor survey only (h5py wants increasing indices,
-    # hence the sort and the reorder back to test_indices order).
-    print("Building same-instrument neighbor pool from the full test set...")
-    if args.direction == "cosmos-to-euclid":
-        img_key, norm_key = "euclid_images_upscaled", "euclid_up"
-    else:
-        img_key, norm_key = "cosmos_images_downscaled", "cosmos_ds"
-    order = np.argsort(test_indices)
-    dataset._open_file()
-    pool_sorted = dataset.file[img_key][test_indices[order]]
-    pool = np.empty_like(pool_sorted)
-    pool[order] = pool_sorted
-    dataset.file.close()
-    dataset.file = None  # so DataLoader workers open their own handle
-    mean, std = NORM_DICT[norm_key]
-    sameins_pool = (torch.from_numpy(pool) - mean) / std #images of the same instrument as the anchor.
-    n_pool = sameins_pool.shape[0] #number of same-instrument galaxies.
 
     # --- Run inference over the full test set ---
     rows = []
     plot_input, plot_generated, plot_mean, plot_target, plot_metadata = [], [], [], [], []
 
-    offset = 0
     autocast = torch.autocast(device_type=device.type, dtype=torch.bfloat16,
                               enabled=args.precision == "bf16-mixed")
     with torch.no_grad(), autocast:
-        for batch_idx, (euclid, cosmos, metadata) in enumerate(tqdm(loader, desc="Generating")):
-            euclid = euclid.to(device)
-            cosmos = cosmos.to(device)
-            B      = euclid.shape[0]
-            masks  = torch.ones(B, 1, dtype=torch.bool, device=device)  # sameins always populated
-
-            if args.direction == "cosmos-to-euclid":
-                anchor, cond = euclid, cosmos
-            else:
-                anchor, cond = cosmos, euclid
-
-            # sameins: a different galaxy of the same instrument as the
-            # anchor (what's being generated), drawn from the full test
-            # set — mirrors train.py's collate_fn, minus the batch-size
-            # dependency.
-            if n_pool > 1:
-                row_pos    = torch.arange(offset, offset + B)
-                rand_local = torch.randint(0, n_pool - 1, (B,))
-                rand_idx   = rand_local + (rand_local >= row_pos)
-                sameins    = sameins_pool[rand_idx].unsqueeze(1).to(device)
-                sameins_ids = test_indices[rand_idx.numpy()].tolist()  # HDF5 rows of the picked neighbours
-            else:
-                sameins = anchor.unsqueeze(1)
-                sameins_ids = [m["idx"] for m in metadata]
-            offset += B
+        for batch_idx, (anchor, cond, sameins, masks, metadata) in enumerate(tqdm(loader, desc="Generating")):
+            anchor  = anchor.to(device)
+            cond    = cond.to(device)
+            sameins = sameins.to(device)
+            masks   = masks.to(device)
 
             # Same conditioning (cond + sameins) for every draw, so the only
             # difference between them is the sampling noise; averaging them
@@ -202,7 +178,7 @@ def main():
             if batch_idx == 0:
                 plot_input     = cond.cpu()
                 plot_sameins   = sameins[:, 0].cpu()
-                plot_sameins_ids = sameins_ids
+                plot_sameins_ids = [m["sameins_idx"] for m in metadata]
                 plot_generated = generations.cpu()
                 plot_mean      = mean_generation.cpu()
                 plot_target    = anchor.cpu()
@@ -256,7 +232,9 @@ def main():
         axes[i, 0].text(0.02, 0.98, f"idx={ids[i]}", fontsize=16,
                         ha="left", va="top", color="magenta",
                         transform=axes[i, 0].transAxes)
-        axes[i, 1].text(0.02, 0.98, f"idx={plot_sameins_ids[i]}", fontsize=16,
+        # -1: no precomputed neighbour, collate_fn fell back to a random one
+        sam_label = f"idx={plot_sameins_ids[i]}" if plot_sameins_ids[i] != -1 else "idx=? (random)"
+        axes[i, 1].text(0.02, 0.98, sam_label, fontsize=16,
                         ha="left", va="top", color="magenta",
                         transform=axes[i, 1].transAxes)
 
