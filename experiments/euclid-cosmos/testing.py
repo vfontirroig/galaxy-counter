@@ -24,7 +24,6 @@ Usage:
 import os
 import sys
 import argparse
-from functools import partial
 import numpy as np
 import pandas as pd
 import torch
@@ -33,14 +32,15 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader, Subset
+from tqdm import tqdm
 
 _here = os.path.dirname(__file__)
 _repo_root = os.path.abspath(os.path.join(_here, "..", ".."))
 sys.path.insert(0, _here)
 sys.path.insert(0, os.path.join(_repo_root, "src"))
 
-from dataset import EuclidCosmosDataset
-from train import EuclidCosmosModel, collate_fn
+from dataset import EuclidCosmosDataset, NORM_DICT, collate_pairs
+from train import EuclidCosmosModel
 
 
 def show_image(ax, img_tensor, title=None):
@@ -71,8 +71,14 @@ def main():
                    help="Fixes the same-instrument neighbour picks and the sampling noise, "
                         "so reruns reproduce the same figure and metrics")
     p.add_argument("--num-workers",type=int, default=4)
+    p.add_argument("--precision",  default="bf16-mixed", choices=["bf16-mixed", "32"],
+                   help="Sampling precision. bf16-mixed matches training (train.py's "
+                        "Trainer precision, which also covers its validation sampling) and "
+                        "is several times faster; 32 is full fp32.")
     args = p.parse_args()
     pl.seed_everything(args.seed, workers=True)
+    torch.backends.cuda.matmul.allow_tf32 = True
+    torch.backends.cudnn.allow_tf32 = True
 
     # Created up front: the figure and CSV are only written after inference
     # over the whole test set, so a missing directory would lose that run.
@@ -101,12 +107,15 @@ def main():
     print(f"Test set: {len(test_indices)} galaxies")
     dataset     = EuclidCosmosDataset(args.h5)
     test_subset = Subset(dataset, test_indices.tolist())
+    # collate_pairs, not train.py's collate_fn: the sameins images collate_fn
+    # reads from the HDF5 would be thrown away here (replaced by the pool
+    # below), so it was one wasted image read per galaxy.
     loader      = DataLoader(
         test_subset,
         batch_size=args.batch_size,
         shuffle=False,
         num_workers=args.num_workers,
-        collate_fn=partial(collate_fn, dataset=dataset),
+        collate_fn=collate_pairs,
     )
 
     # --- Build a same-instrument neighbor pool from the whole test set ---
@@ -114,26 +123,37 @@ def main():
     # batch has only one row (e.g. the last, leftover batch): there'd be no
     # "different" galaxy to pick, and the anchor would leak into its own
     # conditioning. Sampling from the full test set avoids that entirely.
+    # One HDF5 read of the anchor survey only (h5py wants increasing indices,
+    # hence the sort and the reorder back to test_indices order).
     print("Building same-instrument neighbor pool from the full test set...")
-    pool_imgs = []
-    for idx in test_indices.tolist():
-        euc, cos, _ = dataset[idx]
-        pool_imgs.append(euc if args.direction == "cosmos-to-euclid" else cos)
-    sameins_pool = torch.stack(pool_imgs) #images of the same instrument as the anchor.
+    if args.direction == "cosmos-to-euclid":
+        img_key, norm_key = "euclid_images_upscaled", "euclid_up"
+    else:
+        img_key, norm_key = "cosmos_images_downscaled", "cosmos_ds"
+    order = np.argsort(test_indices)
+    dataset._open_file()
+    pool_sorted = dataset.file[img_key][test_indices[order]]
+    pool = np.empty_like(pool_sorted)
+    pool[order] = pool_sorted
+    dataset.file.close()
+    dataset.file = None  # so DataLoader workers open their own handle
+    mean, std = NORM_DICT[norm_key]
+    sameins_pool = (torch.from_numpy(pool) - mean) / std #images of the same instrument as the anchor.
     n_pool = sameins_pool.shape[0] #number of same-instrument galaxies.
 
     # --- Run inference over the full test set ---
     rows = []
     plot_input, plot_generated, plot_mean, plot_target, plot_metadata = [], [], [], [], []
 
-    print("Running inference...")
     offset = 0
-    with torch.no_grad():
-        for batch_idx, (euclid, cosmos, _, masks, metadata) in enumerate(loader):
+    autocast = torch.autocast(device_type=device.type, dtype=torch.bfloat16,
+                              enabled=args.precision == "bf16-mixed")
+    with torch.no_grad(), autocast:
+        for batch_idx, (euclid, cosmos, metadata) in enumerate(tqdm(loader, desc="Generating")):
             euclid = euclid.to(device)
             cosmos = cosmos.to(device)
-            masks  = masks.to(device)
-            B      = euclid.shape[0] 
+            B      = euclid.shape[0]
+            masks  = torch.ones(B, 1, dtype=torch.bool, device=device)  # sameins always populated
 
             if args.direction == "cosmos-to-euclid":
                 anchor, cond = euclid, cosmos
@@ -166,7 +186,7 @@ def main():
                     num_steps=args.num_steps,
                 )
                 for _ in range(args.n_samples)
-            ])  # (n_samples, B, 1, H, W)
+            ]).float()  # (n_samples, B, 1, H, W); metrics in fp32 whatever the precision
             mean_generation = generations.mean(dim=0)  # (B, 1, H, W)
 
             mse_target = ((mean_generation - anchor) ** 2).mean(dim=(1, 2, 3)).cpu()
