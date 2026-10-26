@@ -52,7 +52,8 @@ LAMBDA_COLORS = ["#37cda0", "#2956c4", "#a94620", "#6880f8", "#463d7a", "#d76821
 
 
 def matched_cosine(version_dir, encoder, rep, centering, seed):
-    """Matched cosine for every test pair of one trained version."""
+    """For one training run (version folder), return one cosine per test galaxy:
+    the cosine between its Euclid and its COSMOS embedding."""
     data = np.load(os.path.join(version_dir, "embeddings", "embeddings.npz"))
     euclid = data[f"euclid_emb{encoder}"].astype(np.float64)
     cosmos = data[f"cosmos_emb{encoder}"].astype(np.float64)
