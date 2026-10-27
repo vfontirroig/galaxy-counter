@@ -12,7 +12,7 @@
 #SBATCH --partition=pscompl      # change to your GPU partition
 set -euo pipefail
 
-source /n03data/fontirro/.galaxy-counter/bin/activate
+source /n03data/fontirro/.galaxy-counter-env/bin/activate
 
 # Each array task trains with its own seed into CKPT_DIR/seed<SEED> (see train.py).
 # SEEDS=(1337 2024)
