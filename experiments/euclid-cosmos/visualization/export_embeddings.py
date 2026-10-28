@@ -7,8 +7,7 @@ bimodality analysis has to be done in the original dimension - this script write
 those full-dimensional vectors to a single .npz.
 
 Every pair in the h5 is encoded, in dataset order: row i of each saved array is
-h5 index i, so the arrays join straight to catalog/features and to the
-dataset_idx column of umap_groups_encoder_*.csv.
+h5 index i, so the arrays join straight to catalog/features.
 
 Usage:
     python experiments/euclid-cosmos/visualization/export_embeddings.py \
