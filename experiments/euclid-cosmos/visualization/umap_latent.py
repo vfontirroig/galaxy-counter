@@ -128,6 +128,27 @@ def _save_both(fig, out_path, dpi=150, restyle=True):
     return dark_path
 
 
+def _write_umap_csv(path, indices, euc_pts, cos_pts, pair_ids):
+    """Write each galaxy's UMAP position for one encoder, one row per pair.
+
+    Row i is galaxy indices[i], with its Euclid and COSMOS views' positions in
+    that encoder's shared embedding. highlighted==1 marks the pairs drawn as
+    stars, and `pair` is the number printed next to them (empty otherwise), so a
+    row can be matched to its star and to its panel in the cutouts figure.
+    """
+    pair_of = {int(pid): k + 1 for k, pid in enumerate(pair_ids)}
+    with open(path, "w") as fh:
+        fh.write("dataset_idx,euclid_umap_1,euclid_umap_2,"
+                 "cosmos_umap_1,cosmos_umap_2,highlighted,pair\n")
+        for i in range(len(indices)):
+            pair = pair_of.get(i, "")
+            fh.write(f"{indices[i]},"
+                     f"{euc_pts[i, 0]:.6f},{euc_pts[i, 1]:.6f},"
+                     f"{cos_pts[i, 0]:.6f},{cos_pts[i, 1]:.6f},"
+                     f"{int(i in pair_of)},{pair}\n")
+    print(f"Saved: {path}  ({len(indices)} galaxies, {len(pair_of)} highlighted)")
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--checkpoint",  required=True)
@@ -222,6 +243,15 @@ def main():
     rng = np.random.default_rng(args.seed)
     pair_ids   = rng.choice(N, size=min(args.n_highlight, N), replace=False)
     pair_colors = [PAIR_COLORS[k % len(PAIR_COLORS)] for k in range(len(pair_ids))]
+
+    # --- Per-galaxy UMAP positions, one table per encoder, next to --out ---
+    # The two embeddings are independent, so their coordinates are not
+    # comparable; join the files on dataset_idx to look at a galaxy in both.
+    out_dir = os.path.dirname(os.path.abspath(args.out))
+    _write_umap_csv(os.path.join(out_dir, "umap_groups_encoder_1.csv"),
+                    indices, euc_u1, cos_u1, pair_ids)
+    _write_umap_csv(os.path.join(out_dir, "umap_groups_encoder_2.csv"),
+                    indices, euc_u2, cos_u2, pair_ids)
 
     # --- UMAP plot --- encoder 1
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
