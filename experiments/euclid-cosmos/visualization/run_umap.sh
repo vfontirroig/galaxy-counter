@@ -18,6 +18,6 @@ PLOT_DIR="/n03data/fontirro/euclid-cosmos/plots_model/euclid-cosmos-nir-h-f150w/
 python /n03data/fontirro/euclid-cosmos/galaxy-counter/experiments/euclid-cosmos/visualization/umap_latent.py \
     --checkpoint "${CKPT_DIR}/best-epoch=75-step=92000.ckpt" \
     --h5         "/n03data/fontirro/data_files/euclid_cosmos_pairs_nir_h_f150w_v2.h5" \
-    --out        "${PLOT_DIR}/umap_test.pdf" \
-    --out-cutouts "${PLOT_DIR}/umap_test_cutouts.pdf" \
+    --out        "${PLOT_DIR}/umap_test.png" \
+    --out-cutouts "${PLOT_DIR}/umap_test_cutouts.png" \
     --indices    "${CKPT_DIR}/test_indices.npy"
