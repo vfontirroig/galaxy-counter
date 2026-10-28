@@ -278,7 +278,6 @@ def main():
                markeredgecolor="black", label=f"{len(pair_ids)} highlighted pairs"),
     ]
 
-    ax1.legend(handles=legend_handles, fontsize=15)
     ax1.set_title("encoder_1 — same galaxy (physics)", fontsize=21)
     ax1.set_xlabel("UMAP 1", fontsize=19)
     ax1.set_ylabel("UMAP 2", fontsize=19)
