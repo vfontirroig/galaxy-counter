@@ -25,31 +25,14 @@ also, each divided by the variance of the target image's pixels:
 Both are unitless and unchanged by each survey's (x - mean) / std
 normalisation, so comparable across surveys.
 
-And over the whole test set, per direction:
-  - FID            Fréchet distance between Gaussians fitted to the Inception-v3
-                   pool features (2048-d, standard FID weights from pytorch-fid)
-                   of the real targets and of the generations. Uses the same
-                   mean generation as the per-galaxy metrics (the single draw
-                   when --n-samples is 1). Images go to Inception through one linear
-                   stretch per direction, fixed from the real targets' 0.5 / 99.5
-                   pixel percentiles and shared with the generations, so
-                   flux-level differences are kept (a per-image stretch would
-                   erase them).
-
 The test set is loaded bidirectionally, as in training: even h5 rows have a
 Euclid target (COSMOS input), odd rows a COSMOS target (Euclid input).
 
 Writes to --out-dir:
   per_galaxy.csv             idx, anchor_survey, mse_mean_vs_target, pixel_frechet,
                              nmse_mean_vs_target, npixel_frechet
-  fid.csv                    anchor_survey, n, fid
   histograms.png             per-galaxy MSE | per-galaxy pixel Fréchet distance
   histograms_normalised.png  per-galaxy normalised MSE | normalised pixel Fréchet
-
-Needs pytorch-fid. Its Inception weights are downloaded on first use into
-~/.cache/torch/hub/checkpoints; if compute nodes have no internet, fetch them
-once on the login node:
-    python -c "from pytorch_fid.inception import fid_inception_v3; fid_inception_v3()"
 
 Usage:
     python experiments/euclid-cosmos/visualization/cutout_metrics.py \
@@ -72,8 +55,6 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader, Subset
 from tqdm import tqdm
-from pytorch_fid.inception import InceptionV3
-from pytorch_fid.fid_score import calculate_frechet_distance
 
 _here = os.path.dirname(__file__)
 _experiment_dir = os.path.abspath(os.path.join(_here, ".."))
@@ -102,35 +83,6 @@ def target_variance(target):
     Population variance (unbiased=False), so MSE / variance is exactly 1 - R^2.
     """
     return target.flatten(1).var(dim=1, unbiased=False)
-
-
-def inception_features(images, inception, lo, hi, batch_size, device):
-    """Inception-v3 pool features, (N, 1, H, W) in normalised units -> (N, 2048).
-
-    Pixels are mapped to [0, 1] by the fixed stretch lo -> 0, hi -> 1 and the
-    single band repeated to 3 channels; InceptionV3 itself resizes to 299 x 299
-    and rescales to [-1, 1].
-    """
-    feats = []
-    with torch.no_grad():
-        for batch in images.split(batch_size):
-            x = ((batch - lo) / (hi - lo)).clamp(0, 1).repeat(1, 3, 1, 1).to(device)
-            feats.append(inception(x)[0].flatten(1).cpu())
-    return torch.cat(feats).double().numpy()
-
-
-def fid(feats_a, feats_b):
-    """Fréchet distance between Gaussians fitted to two (N, D) feature sets."""
-    return float(calculate_frechet_distance(feats_a.mean(axis=0), np.cov(feats_a, rowvar=False),
-                                            feats_b.mean(axis=0), np.cov(feats_b, rowvar=False)))
-
-
-def direction_fid(real, generated, inception, batch_size, device):
-    """FID of one direction, real targets vs generations, both (N, 1, H, W)."""
-    lo, hi = np.percentile(real.numpy(), [0.5, 99.5])
-    f_real = inception_features(real, inception, lo, hi, batch_size, device)
-    f_gen  = inception_features(generated, inception, lo, hi, batch_size, device)
-    return fid(f_real, f_gen)
 
 
 def metric_hist(ax, values, xlabel, title):
@@ -190,7 +142,7 @@ def main():
     p.add_argument("--indices",     required=True, help="test_indices.npy saved by train.py")
     p.add_argument("--out-dir",     required=True)
     p.add_argument("--n-samples",   type=int, default=3,
-                   help="Generations per input, averaged into the mean (FID uses only the first)")
+                   help="Generations per input, averaged into the mean")
     p.add_argument("--num-steps",   type=int, default=100, help="ODE integration steps")
     p.add_argument("--batch-size",  type=int, default=64)
     p.add_argument("--num-workers", type=int, default=4)
@@ -232,8 +184,6 @@ def main():
 
     # --- Generate: one draw per input ---
     rows = []
-    # Kept whole for FID, which needs the full population of each direction
-    real_targets, mean_generations, surveys = [], [], []
     autocast = torch.autocast(device_type=device.type, dtype=torch.bfloat16,
                               enabled=args.precision == "bf16-mixed")
     with torch.no_grad(), autocast:
@@ -256,10 +206,6 @@ def main():
             ]).float()  # (n_samples, B, 1, H, W); metrics in fp32 whatever the precision
             mean_generation = draws.mean(dim=0)
 
-            real_targets.append(anchor.cpu())
-            mean_generations.append(mean_generation.cpu())
-            surveys.extend(m["anchor_survey"] for m in metadata)
-
             mse = ((mean_generation - anchor) ** 2).mean(dim=(1, 2, 3)).cpu()
             fd  = pixel_frechet(anchor, mean_generation).cpu()
             var_t = target_variance(anchor).cpu()
@@ -280,29 +226,6 @@ def main():
                        ("npixel_frechet", "Normalised Fréchet")]:
         v = per_galaxy[col]
         print(f"{label:<18}: mean {v.mean():.6g}  median {v.median():.6g}  std {v.std():.6g}")
-
-    # --- FID, per direction ---
-    real_targets = torch.cat(real_targets)
-    mean_generations = torch.cat(mean_generations)
-    surveys      = np.array(surveys)
-    inception = InceptionV3([InceptionV3.BLOCK_INDEX_BY_DIM[2048]]).to(device).eval()
-
-    fid_rows = []
-    print(f"\n=== FID (mean of {args.n_samples} generations per galaxy) ===")
-    for survey in ("euclid", "cosmos"):
-        sel = torch.from_numpy(surveys == survey)
-        n = int(sel.sum())
-        if n < 2:
-            print(f"[WARN] {n} galaxies with a {survey} target, FID skipped")
-            continue
-        if n < 2048:
-            print(f"[WARN] {n} galaxies with a {survey} target, fewer than the 2048 "
-                  f"feature dimensions: FID is strongly biased upwards")
-        value = direction_fid(real_targets[sel], mean_generations[sel], inception,
-                              args.batch_size, device)
-        fid_rows.append({"anchor_survey": survey, "n": n, "fid": value})
-        print(f"{survey} target (N={n}): FID {value:.4g}")
-    pd.DataFrame(fid_rows).to_csv(os.path.join(args.out_dir, "fid.csv"), index=False, float_format="%.6g")
 
     plot_histograms(per_galaxy, args.n_samples, os.path.join(args.out_dir, "histograms.png"))
     plot_normalised_histograms(per_galaxy, args.n_samples,
