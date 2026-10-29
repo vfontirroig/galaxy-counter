@@ -28,21 +28,13 @@ normalisation, so comparable across surveys.
 And over the whole test set, per direction:
   - FID            Fréchet distance between Gaussians fitted to the Inception-v3
                    pool features (2048-d, standard FID weights from pytorch-fid)
-                   of the real targets and of the generations. Uses the first
-                   draw of each galaxy, not the mean: averaging blurs the image,
-                   which FID would penalise, and it keeps FID independent of
-                   --n-samples. Images go to Inception through one linear
+                   of the real targets and of the generations. Uses the same
+                   mean generation as the per-galaxy metrics (the single draw
+                   when --n-samples is 1). Images go to Inception through one linear
                    stretch per direction, fixed from the real targets' 0.5 / 99.5
                    pixel percentiles and shared with the generations, so
                    flux-level differences are kept (a per-image stretch would
                    erase them).
-  - FID floor      FID is biased upwards at small N, so its absolute value says
-                   little on its own. The test galaxies are split in two random
-                   halves A, B and
-                       floor_half = FID(real A, real B)
-                       fid_half   = FID(real A, generated B)
-                   are computed on the same sizes: a model indistinguishable from
-                   the real data has fid_half ~ floor_half.
 
 The test set is loaded bidirectionally, as in training: even h5 rows have a
 Euclid target (COSMOS input), odd rows a COSMOS target (Euclid input).
@@ -50,7 +42,7 @@ Euclid target (COSMOS input), odd rows a COSMOS target (Euclid input).
 Writes to --out-dir:
   per_galaxy.csv             idx, anchor_survey, mse_mean_vs_target, pixel_frechet,
                              nmse_mean_vs_target, npixel_frechet
-  fid.csv                    anchor_survey, n, fid, fid_half, floor_half
+  fid.csv                    anchor_survey, n, fid
   histograms.png             per-galaxy MSE | per-galaxy pixel Fréchet distance
   histograms_normalised.png  per-galaxy normalised MSE | normalised pixel Fréchet
 
@@ -133,22 +125,12 @@ def fid(feats_a, feats_b):
                                             feats_b.mean(axis=0), np.cov(feats_b, rowvar=False)))
 
 
-def direction_fid(real, generated, inception, batch_size, device, rng):
-    """FID of one direction, plus the real-vs-real floor on equal-size halves.
-
-    real, generated: (N, 1, H, W), row i of both the same galaxy.
-    """
+def direction_fid(real, generated, inception, batch_size, device):
+    """FID of one direction, real targets vs generations, both (N, 1, H, W)."""
     lo, hi = np.percentile(real.numpy(), [0.5, 99.5])
     f_real = inception_features(real, inception, lo, hi, batch_size, device)
     f_gen  = inception_features(generated, inception, lo, hi, batch_size, device)
-
-    half = len(real) // 2
-    perm = rng.permutation(len(real))
-    a, b = perm[:half], perm[half:2 * half]
-    return {"n": len(real),
-            "fid": fid(f_real, f_gen),
-            "fid_half": fid(f_real[a], f_gen[b]),
-            "floor_half": fid(f_real[a], f_real[b])}
+    return fid(f_real, f_gen)
 
 
 def metric_hist(ax, values, xlabel, title):
@@ -248,10 +230,10 @@ def main():
     )
     print(f"Test set: {len(test_indices)} galaxies")
 
-    # --- Generate: mean of n_samples draws per input ---
+    # --- Generate: one draw per input ---
     rows = []
     # Kept whole for FID, which needs the full population of each direction
-    real_targets, first_draws, surveys = [], [], []
+    real_targets, mean_generations, surveys = [], [], []
     autocast = torch.autocast(device_type=device.type, dtype=torch.bfloat16,
                               enabled=args.precision == "bf16-mixed")
     with torch.no_grad(), autocast:
@@ -275,7 +257,7 @@ def main():
             mean_generation = draws.mean(dim=0)
 
             real_targets.append(anchor.cpu())
-            first_draws.append(draws[0].cpu())
+            mean_generations.append(mean_generation.cpu())
             surveys.extend(m["anchor_survey"] for m in metadata)
 
             mse = ((mean_generation - anchor) ** 2).mean(dim=(1, 2, 3)).cpu()
@@ -301,27 +283,25 @@ def main():
 
     # --- FID, per direction ---
     real_targets = torch.cat(real_targets)
-    first_draws  = torch.cat(first_draws)
+    mean_generations = torch.cat(mean_generations)
     surveys      = np.array(surveys)
     inception = InceptionV3([InceptionV3.BLOCK_INDEX_BY_DIM[2048]]).to(device).eval()
-    rng = np.random.default_rng(args.seed)
 
     fid_rows = []
-    print("\n=== FID (first generation per galaxy) ===")
+    print(f"\n=== FID (mean of {args.n_samples} generations per galaxy) ===")
     for survey in ("euclid", "cosmos"):
         sel = torch.from_numpy(surveys == survey)
         n = int(sel.sum())
-        if n < 4:
+        if n < 2:
             print(f"[WARN] {n} galaxies with a {survey} target, FID skipped")
             continue
         if n < 2048:
             print(f"[WARN] {n} galaxies with a {survey} target, fewer than the 2048 "
-                  f"feature dimensions: FID is strongly biased, compare it with floor_half")
-        r = direction_fid(real_targets[sel], first_draws[sel], inception,
-                          args.batch_size, device, rng)
-        fid_rows.append({"anchor_survey": survey, **r})
-        print(f"{survey} target (N={n}): FID {r['fid']:.4g}  |  "
-              f"half-size: FID {r['fid_half']:.4g}  floor (real vs real) {r['floor_half']:.4g}")
+                  f"feature dimensions: FID is strongly biased upwards")
+        value = direction_fid(real_targets[sel], mean_generations[sel], inception,
+                              args.batch_size, device)
+        fid_rows.append({"anchor_survey": survey, "n": n, "fid": value})
+        print(f"{survey} target (N={n}): FID {value:.4g}")
     pd.DataFrame(fid_rows).to_csv(os.path.join(args.out_dir, "fid.csv"), index=False, float_format="%.6g")
 
     plot_histograms(per_galaxy, args.n_samples, os.path.join(args.out_dir, "histograms.png"))

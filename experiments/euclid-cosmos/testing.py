@@ -4,8 +4,8 @@ random selection of held-out test galaxies.
 
 Draws --n-galaxies random galaxies from the test indices saved by train.py
 (fixed by --seed), generates --n-samples independent images per input (same
-conditioning, different noise) and plots them with their mean.
-Figure columns depend on direction:
+conditioning, different noise) and plots them with their mean (no Mean column
+when --n-samples is 1). Figure columns depend on direction:
   cosmos-to-euclid:
       [COSMOS input | Same-instrument input | Generated #1..N | Mean | Real Euclid]
   euclid-to-cosmos:
@@ -194,7 +194,8 @@ def main():
     col_titles = (
         [input_label, "Same-instrument input"]
         + [f"Generated #{k + 1}" for k in range(args.n_samples)]
-        + [f"Mean of {args.n_samples}", real_label]
+        + ([f"Mean of {args.n_samples}"] if args.n_samples > 1 else [])
+        + [real_label]
     )
     n_cols = len(col_titles)
 
@@ -213,8 +214,9 @@ def main():
         for k in range(args.n_samples):
             show_image(axes[i, 2 + k], plot_generated[k, i])
             show_metrics(axes[i, 2 + k], plot_generated[k, i], plot_target[i])
-        show_image(axes[i, -2], plot_mean[i])
-        show_metrics(axes[i, -2], plot_mean[i], plot_target[i])
+        if args.n_samples > 1:
+            show_image(axes[i, -2], plot_mean[i])
+            show_metrics(axes[i, -2], plot_mean[i], plot_target[i])
         show_image(axes[i, -1], plot_target[i])
 
         axes[i, 0].text(0.02, 0.98, f"idx={ids[i]}", fontsize=16,
