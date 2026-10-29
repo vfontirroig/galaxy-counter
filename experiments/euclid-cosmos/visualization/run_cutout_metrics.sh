@@ -33,7 +33,7 @@ python /n03data/fontirro/euclid-cosmos/galaxy-counter/experiments/euclid-cosmos/
     --h5          "/n03data/fontirro/data_files/euclid_cosmos_pairs_nir_h_f150w_v2.h5" \
     --indices     "${CKPT_DIR}/test_indices.npy" \
     --out-dir     "${OUT_DIR}" \
-    --n-samples   3 \
+    --n-samples   1 \
     --num-steps   100 \
     --precision   bf16-mixed \
     --seed        42
