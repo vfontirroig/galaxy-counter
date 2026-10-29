@@ -14,7 +14,7 @@ set -euo pipefail
 source /n03data/fontirro/.galaxy-counter-env/bin/activate
 
 VERSION="v${SLURM_ARRAY_TASK_ID}"
-RUN_NAME="fid_v3"                # output subfolder; change it for runs with other settings
+RUN_NAME="fid_v4"                # output subfolder; change it for runs with other settings
 CKPT_DIR="/n03data/fontirro/euclid-cosmos/checkpoints/euclid-cosmos-nir-h-f150w/test-1-phase1/${VERSION}"
 OUT_DIR="/n03data/fontirro/euclid-cosmos/plots_model/euclid-cosmos-nir-h-f150w/test-1-phase1/${VERSION}/${RUN_NAME}"
 
