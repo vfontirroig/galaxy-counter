@@ -28,7 +28,7 @@ if (( ${#CKPTS[@]} != 1 )); then
 fi
 echo "Version ${VERSION}: ${CKPTS[0]}"
 
-python /n03data/fontirro/euclid-cosmos/galaxy-counter/experiments/euclid-cosmos/visualization/fid_plot.py \
+python /n03data/fontirro/euclid-cosmos/galaxy-counter/experiments/euclid-cosmos/visualization/cutout_metrics.py \
     --checkpoint  "${CKPTS[0]}" \
     --h5          "/n03data/fontirro/data_files/euclid_cosmos_pairs_nir_h_f150w_v2.h5" \
     --indices     "${CKPT_DIR}/test_indices.npy" \

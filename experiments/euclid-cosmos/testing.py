@@ -1,16 +1,18 @@
 """
-Test the trained Euclid x COSMOS flow-matching model on the held-out test set.
+Plot generations of the trained Euclid x COSMOS flow-matching model for a
+random selection of held-out test galaxies.
 
-Loads the test indices saved by train.py, generates --n-samples independent
-images per input (same conditioning, different noise), averages them, and
-reports MSE of that mean against the target and against the input.
+Draws --n-galaxies random galaxies from the test indices saved by train.py
+(fixed by --seed), generates --n-samples independent images per input (same
+conditioning, different noise) and plots them with their mean.
 Figure columns depend on direction:
   cosmos-to-euclid:
-      [COSMOS input | Generated #1..N | Mean | Real Euclid | Residual (Mean - Real)]
+      [COSMOS input | Same-instrument input | Generated #1..N | Mean | Real Euclid]
   euclid-to-cosmos:
-      [Euclid input | Generated #1..N | Mean | Real COSMOS | Residual (Mean - Real)]
-
-Per-galaxy metrics are written to --metrics (default: metrics.csv next to --out).
+      [Euclid input | Same-instrument input | Generated #1..N | Mean | Real COSMOS]
+Each generated cutout and the mean are labelled with their pixel Fréchet
+distance (FID, see visualization/cutout_metrics.py) and MSE against the real
+target, in the normalised units of the target survey.
 
 Usage:
     python experiments/euclid-cosmos/testing.py \
@@ -18,7 +20,8 @@ Usage:
         --h5         /n03data/fontirro/data_files/euclid_cosmos_pairs_vis_f150w.h5 \
         --indices    /n03data/fontirro/checkpoints/euclid-cosmos-vis-f150w/test-4-phase1/test_indices.npy \
         --out        /n03data/fontirro/checkpoints/euclid-cosmos-vis-f150w/test-4-phase1/test_results.png \
-        --direction  cosmos-to-euclid
+        --direction  cosmos-to-euclid \
+        --n-galaxies 8
 """
 
 import os
@@ -26,7 +29,6 @@ import sys
 import argparse
 from functools import partial
 import numpy as np
-import pandas as pd
 import torch
 import pytorch_lightning as pl
 import matplotlib
@@ -42,6 +44,7 @@ sys.path.insert(0, os.path.join(_repo_root, "src"))
 
 from dataset import EuclidCosmosDataset
 from train import EuclidCosmosModel, collate_fn
+from visualization.cutout_metrics import pixel_frechet
 
 
 class OneDirectionDataset(EuclidCosmosDataset):
@@ -71,25 +74,32 @@ def show_image(ax, img_tensor, title=None):
     ax.axis("off")
 
 
+def show_metrics(ax, generated, target):
+    """Write the cutout's pixel Fréchet distance and MSE vs the target in its upper right."""
+    fid = pixel_frechet(target[None], generated[None]).item()
+    mse = ((generated - target) ** 2).mean().item()
+    ax.text(0.98, 0.98, f"FID={fid:.3g}\nMSE={mse:.3g}", fontsize=12,
+            ha="right", va="top", color="magenta",
+            transform=ax.transAxes)
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--checkpoint", required=True)
     p.add_argument("--h5",         required=True)
     p.add_argument("--indices",    required=True, help="test_indices.npy saved by train.py")
     p.add_argument("--out",        default="test_results.png")
-    p.add_argument("--metrics",    default=None,
-                   help="Per-galaxy metrics CSV (default: metrics.csv in the --out directory)")
     p.add_argument("--direction",  default="cosmos-to-euclid",
                    choices=["cosmos-to-euclid", "euclid-to-cosmos"],
                    help="cosmos-to-euclid: COSMOS input, generate Euclid"
                         "euclid-to-cosmos: Euclid input, generate COSMOS")
-    p.add_argument("--n-plot",     type=int, default=8,   help="Galaxy rows to show in figure")
+    p.add_argument("--n-galaxies", type=int, default=8,   help="Random test galaxies to generate and plot")
     p.add_argument("--batch-size", type=int, default=64)
     p.add_argument("--num-steps",  type=int, default=100, help="ODE integration steps")
     p.add_argument("--n-samples",  type=int, default=3,   help="Generations per input, averaged into the mean")
     p.add_argument("--seed",       type=int, default=42,
-                   help="Fixes the neighbour fallbacks and the sampling noise, "
-                        "so reruns reproduce the same figure and metrics")
+                   help="Fixes the galaxy selection, the neighbour fallbacks and the "
+                        "sampling noise, so reruns reproduce the same figure")
     p.add_argument("--num-workers",type=int, default=4)
     p.add_argument("--precision",  default="bf16-mixed", choices=["bf16-mixed", "32"],
                    help="Sampling precision. bf16-mixed matches training (train.py's "
@@ -100,11 +110,8 @@ def main():
     torch.backends.cuda.matmul.allow_tf32 = True
     torch.backends.cudnn.allow_tf32 = True
 
-    # Created up front: the figure and CSV are only written after inference
-    # over the whole test set, so a missing directory would lose that run.
-    metrics_path = args.metrics or os.path.join(os.path.dirname(os.path.abspath(args.out)), "metrics.csv")
+    # Created up front so a missing directory doesn't lose the run after sampling.
     os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
-    os.makedirs(os.path.dirname(os.path.abspath(metrics_path)), exist_ok=True)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}")
@@ -122,38 +129,40 @@ def main():
     model.eval()
     model.to(device)
 
-    # --- Build test dataset from saved indices ---
+    # --- Pick random test galaxies ---
     test_indices = np.load(args.indices)
-    print(f"Test set: {len(test_indices)} galaxies")
+    n = min(args.n_galaxies, len(test_indices))
+    rng = np.random.default_rng(args.seed)
+    chosen = rng.choice(test_indices, size=n, replace=False)
+    print(f"Test set: {len(test_indices)} galaxies, plotting {n} random ones")
+
     # sameins is the precomputed same-instrument sky neighbour, read by
     # train.py's collate_fn exactly as in training and fid_plot.py.
     anchor_survey = "euclid" if args.direction == "cosmos-to-euclid" else "cosmos"
     dataset     = OneDirectionDataset(args.h5, anchor_survey)
-    test_subset = Subset(dataset, test_indices.tolist())
+    subset      = Subset(dataset, chosen.tolist())
     loader      = DataLoader(
-        test_subset,
+        subset,
         batch_size=args.batch_size,
         shuffle=False,
         num_workers=args.num_workers,
         collate_fn=partial(collate_fn, dataset=dataset),
     )
 
-    # --- Run inference over the full test set ---
-    rows = []
-    plot_input, plot_generated, plot_mean, plot_target, plot_metadata = [], [], [], [], []
+    # --- Generate ---
+    plot_input, plot_sameins, plot_generated, plot_mean, plot_target = [], [], [], [], []
+    plot_metadata = []
 
     autocast = torch.autocast(device_type=device.type, dtype=torch.bfloat16,
                               enabled=args.precision == "bf16-mixed")
     with torch.no_grad(), autocast:
-        for batch_idx, (anchor, cond, sameins, masks, metadata) in enumerate(tqdm(loader, desc="Generating")):
-            anchor  = anchor.to(device)
+        for anchor, cond, sameins, masks, metadata in tqdm(loader, desc="Generating"):
             cond    = cond.to(device)
             sameins = sameins.to(device)
             masks   = masks.to(device)
 
             # Same conditioning (cond + sameins) for every draw, so the only
-            # difference between them is the sampling noise; averaging them
-            # cancels that scatter.
+            # difference between them is the sampling noise.
             generations = torch.stack([
                 model.sample(
                     cond_image_samegal=cond,
@@ -162,37 +171,20 @@ def main():
                     num_steps=args.num_steps,
                 )
                 for _ in range(args.n_samples)
-            ]).float()  # (n_samples, B, 1, H, W); metrics in fp32 whatever the precision
-            mean_generation = generations.mean(dim=0)  # (B, 1, H, W)
+            ]).float()  # (n_samples, B, 1, H, W)
 
-            mse_target = ((mean_generation - anchor) ** 2).mean(dim=(1, 2, 3)).cpu()
-            mse_input  = ((mean_generation - cond) ** 2).mean(dim=(1, 2, 3)).cpu()
-            for i, m in enumerate(metadata):
-                rows.append({
-                    "idx": m["idx"],
-                    "direction": args.direction,
-                    "mse_mean_vs_target": mse_target[i].item(),
-                    "mse_mean_vs_input": mse_input[i].item(),
-                })
+            plot_input.append(cond.cpu())
+            plot_sameins.append(sameins[:, 0].cpu())
+            plot_generated.append(generations.cpu())
+            plot_mean.append(generations.mean(dim=0).cpu())
+            plot_target.append(anchor)
+            plot_metadata.extend(metadata)
 
-            if batch_idx == 0:
-                plot_input     = cond.cpu()
-                plot_sameins   = sameins[:, 0].cpu()
-                plot_sameins_ids = [m["sameins_idx"] for m in metadata]
-                plot_generated = generations.cpu()
-                plot_mean      = mean_generation.cpu()
-                plot_target    = anchor.cpu()
-                plot_metadata  = metadata
-
-    df = pd.DataFrame(rows)
-    df.to_csv(metrics_path, index=False, float_format="%.6f")
-
-    print(f"\n=== Test Results ({args.direction}, mean of {args.n_samples} generations) ===")
-    print(f"N test galaxies : {len(df)}")
-    for col, label in [("mse_mean_vs_target", "vs target"), ("mse_mean_vs_input", "vs input")]:
-        print(f"MSE {label:<10}: mean {df[col].mean():.6f}  "
-              f"median {df[col].median():.6f}  std {df[col].std():.6f}")
-    print(f"Metrics saved: {metrics_path}")
+    plot_input     = torch.cat(plot_input)
+    plot_sameins   = torch.cat(plot_sameins)
+    plot_generated = torch.cat(plot_generated, dim=1)
+    plot_mean      = torch.cat(plot_mean)
+    plot_target    = torch.cat(plot_target)
 
     # --- Figure ---
     if args.direction == "cosmos-to-euclid":
@@ -202,12 +194,12 @@ def main():
     col_titles = (
         [input_label, "Same-instrument input"]
         + [f"Generated #{k + 1}" for k in range(args.n_samples)]
-        + [f"Mean of {args.n_samples}", real_label, "Residual (Mean - Real)"]
+        + [f"Mean of {args.n_samples}", real_label]
     )
     n_cols = len(col_titles)
 
-    n = min(args.n_plot, len(plot_input))
-    ids = [m["idx"] for m in plot_metadata[:n]]
+    ids = [m["idx"] for m in plot_metadata]
+    sameins_ids = [m["sameins_idx"] for m in plot_metadata]
     fig, axes = plt.subplots(n, n_cols, figsize=(2.25 * n_cols, 2.5 * n))
     if n == 1:
         axes = axes[None, :]
@@ -220,27 +212,23 @@ def main():
         show_image(axes[i, 1], plot_sameins[i])
         for k in range(args.n_samples):
             show_image(axes[i, 2 + k], plot_generated[k, i])
-        show_image(axes[i, -3], plot_mean[i])
-        show_image(axes[i, -2], plot_target[i])
-
-        residual = (plot_mean[i] - plot_target[i]).squeeze().float().numpy()
-        #vmax = np.abs(residual).max()
-        im = axes[i, -1].imshow(residual, cmap="coolwarm")
-        axes[i, -1].axis("off")
-        fig.colorbar(im, ax=axes[i, -1], fraction=0.046, pad=0.04)
+            show_metrics(axes[i, 2 + k], plot_generated[k, i], plot_target[i])
+        show_image(axes[i, -2], plot_mean[i])
+        show_metrics(axes[i, -2], plot_mean[i], plot_target[i])
+        show_image(axes[i, -1], plot_target[i])
 
         axes[i, 0].text(0.02, 0.98, f"idx={ids[i]}", fontsize=16,
                         ha="left", va="top", color="magenta",
                         transform=axes[i, 0].transAxes)
         # -1: no precomputed neighbour, collate_fn fell back to a random one
-        sam_label = f"idx={plot_sameins_ids[i]}" if plot_sameins_ids[i] != -1 else "idx=? (random)"
+        sam_label = f"idx={sameins_ids[i]}" if sameins_ids[i] != -1 else "idx=? (random)"
         axes[i, 1].text(0.02, 0.98, sam_label, fontsize=16,
                         ha="left", va="top", color="magenta",
                         transform=axes[i, 1].transAxes)
 
     fig.suptitle(
-        f"Test set ({args.direction})  |  Mean MSE (mean vs target) = {df['mse_mean_vs_target'].mean():.5f}"
-        f"  |  N = {len(df)}",
+        f"Test set ({args.direction})"
+        f"  |  {n} random galaxies",
         fontsize=18, y=0.98,
     )
     plt.tight_layout(rect=[0, 0, 1, 0.99])

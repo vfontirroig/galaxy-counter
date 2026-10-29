@@ -19,8 +19,7 @@ python /n03data/fontirro/euclid-cosmos/galaxy-counter/experiments/euclid-cosmos/
     --checkpoint "${CKPT_DIR}/best-epoch=75-step=92000.ckpt" \
     --h5         "/n03data/fontirro/data_files/euclid_cosmos_pairs_nir_h_f150w_v2.h5" \
     --indices    "${CKPT_DIR}/test_indices.npy" \
-    --out        "${PLOT_DIR}/test_results_cos_euc.png" \
-    --n-plot     5 \
+    --out        "${PLOT_DIR}/test_results_euc_cos.png" \
+    --n-galaxies 5 \
     --num-steps  100 \
-    --direction "cosmos-to-euclid" \
-    --metrics "${PLOT_DIR}/metrics_cos_euc.csv"
+    --direction "euclid-to-cosmos"
