@@ -3,7 +3,7 @@
 #SBATCH --output=/n03data/fontirro/euclid-cosmos/logs/euclid_cosmos_test_%A_v%a.out
 #SBATCH --error=/n03data/fontirro/euclid-cosmos/logs/euclid_cosmos_test_%A_v%a.err
 #SBATCH --ntasks=1
-#SBATCH --array=15            
+#SBATCH --array=7            
 ##SBATCH --array=4-14             # one task per version: v4 ... v14
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=16G

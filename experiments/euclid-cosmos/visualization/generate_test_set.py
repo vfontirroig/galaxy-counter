@@ -83,8 +83,13 @@ def main():
     out_dir = os.path.join(args.out_dir, args.version)
     os.makedirs(out_dir, exist_ok=True)
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Device: {device}")
+    # On CPU the whole test set takes days and the job hits its time limit, so
+    # stop now rather than after hours of sampling.
+    if not torch.cuda.is_available():
+        sys.exit(f"No GPU visible to torch {torch.__version__} (CUDA build: {torch.version.cuda}, "
+                 f"CUDA_VISIBLE_DEVICES={os.environ.get('CUDA_VISIBLE_DEVICES')}); refusing to run on CPU.")
+    device = torch.device("cuda")
+    print(f"Device: {device} ({torch.cuda.get_device_name(0)})")
 
     # --- Load model ---
     print(f"Loading checkpoint: {args.checkpoint}")
