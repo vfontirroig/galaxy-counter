@@ -10,9 +10,8 @@ when --n-samples is 1). Figure columns depend on direction:
       [COSMOS input | Same-instrument input | Generated #1..N | Mean | Real Euclid]
   euclid-to-cosmos:
       [Euclid input | Same-instrument input | Generated #1..N | Mean | Real COSMOS]
-Each generated cutout and the mean are labelled with their pixel Fréchet
-distance (FID, see visualization/cutout_metrics.py) and MSE against the real
-target, in the normalised units of the target survey.
+Each generated cutout and the mean are labelled with their MSE against the
+real target, in the normalised units of the target survey.
 
 Usage:
     python experiments/euclid-cosmos/testing.py \
@@ -44,7 +43,6 @@ sys.path.insert(0, os.path.join(_repo_root, "src"))
 
 from dataset import EuclidCosmosDataset
 from train import EuclidCosmosModel, collate_fn
-from visualization.cutout_metrics import pixel_frechet
 
 
 class OneDirectionDataset(EuclidCosmosDataset):
@@ -75,10 +73,9 @@ def show_image(ax, img_tensor, title=None):
 
 
 def show_metrics(ax, generated, target):
-    """Write the cutout's pixel Fréchet distance and MSE vs the target in its upper right."""
-    fid = pixel_frechet(target[None], generated[None]).item()
+    """Write the cutout's MSE vs the target in its upper right."""
     mse = ((generated - target) ** 2).mean().item()
-    ax.text(0.98, 0.98, f"FID={fid:.3g}\nMSE={mse:.3g}", fontsize=12,
+    ax.text(0.98, 0.98, f"MSE={mse:.3g}", fontsize=12,
             ha="right", va="top", color="white",
             transform=ax.transAxes)
 
