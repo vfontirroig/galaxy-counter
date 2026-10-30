@@ -12,11 +12,11 @@ set -euo pipefail
 
 source /n03data/fontirro/.galaxy-counter-env/bin/activate
 
-CKPT_DIR="/n03data/fontirro/euclid-cosmos/checkpoints/euclid-cosmos-nir-h-f150w/test-1-phase1/v14"
+CKPT_DIR="/n03data/fontirro/euclid-cosmos/checkpoints/euclid-cosmos-nir-h-f150w/test-1-phase1/v15"
 H5_FILE="/n03data/fontirro/data_files/euclid_cosmos_pairs_nir_h_f150w_v2.h5"
-OUT_DIR="/n03data/fontirro/euclid-cosmos/checkpoints/euclid-cosmos-nir-h-f150w/test-1-phase1/v14/embeddings"
+OUT_DIR="/n03data/fontirro/euclid-cosmos/checkpoints/euclid-cosmos-nir-h-f150w/test-1-phase1/v15/embeddings"
 
 python /n03data/fontirro/euclid-cosmos/galaxy-counter/experiments/euclid-cosmos/visualization/export_embeddings.py \
---checkpoint  "${CKPT_DIR}/best-epoch=52-step=64000.ckpt" \
+--checkpoint  "${CKPT_DIR}/best-epoch=94-step=115000.ckpt" \
 --h5          "${H5_FILE}" \
 --out         "${OUT_DIR}/embeddings.npz" \
