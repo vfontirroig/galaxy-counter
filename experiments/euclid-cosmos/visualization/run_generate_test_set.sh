@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #SBATCH --job-name=euclid_cosmos_gen_test
-#SBATCH --array=15            
+#SBATCH --array=7           
 ##SBATCH --array=4-14             # one task per version: v4 ... v14
 #SBATCH --output=/n03data/fontirro/euclid-cosmos/logs/euclid_cosmos_gen_test_%A_v%a.out
 #SBATCH --error=/n03data/fontirro/euclid-cosmos/logs/euclid_cosmos_gen_test_%A_v%a.err
