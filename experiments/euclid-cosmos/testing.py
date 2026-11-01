@@ -75,7 +75,7 @@ def show_image(ax, img_tensor, title=None):
 def show_metrics(ax, generated, target):
     """Write the cutout's MSE vs the target in its upper right."""
     mse = ((generated - target) ** 2).mean().item()
-    ax.text(0.98, 0.98, f"MSE={mse:.3g}", fontsize=12,
+    ax.text(0.98, 0.98, f"MSE={mse:.3g}", fontsize=16, fontweight="bold",
             ha="right", va="top", color="white",
             transform=ax.transAxes)
 
@@ -216,12 +216,12 @@ def main():
             show_metrics(axes[i, -2], plot_mean[i], plot_target[i])
         show_image(axes[i, -1], plot_target[i])
 
-        axes[i, 0].text(0.02, 0.98, f"idx={ids[i]}", fontsize=16,
+        axes[i, 0].text(0.02, 0.98, f"idx={ids[i]}", fontsize=16, fontweight="bold",
                         ha="left", va="top", color="white",
                         transform=axes[i, 0].transAxes)
         # -1: no precomputed neighbour, collate_fn fell back to a random one
         sam_label = f"idx={sameins_ids[i]}" if sameins_ids[i] != -1 else "idx=? (random)"
-        axes[i, 1].text(0.02, 0.98, sam_label, fontsize=16,
+        axes[i, 1].text(0.02, 0.98, sam_label, fontsize=16, fontweight="bold",
                         ha="left", va="top", color="white",
                         transform=axes[i, 1].transAxes)
 
