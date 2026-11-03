@@ -278,7 +278,7 @@ def main():
                markeredgecolor="black", label=f"{len(pair_ids)} highlighted pairs"),
     ]
 
-    ax1.set_title("encoder_1 — same galaxy (physics)", fontsize=21)
+    ax1.set_title("Physics latent space", fontsize=21)
     ax1.set_xlabel("UMAP 1", fontsize=19)
     ax1.set_ylabel("UMAP 2", fontsize=19)
 
@@ -298,7 +298,7 @@ def main():
             ax2.annotate(label, xy=(x, y), xytext=(4, 4), textcoords="offset points",
                          fontsize=16, color=color, fontweight="bold")
 
-    ax2.set_title("encoder_2 — same instrument", fontsize=21)
+    ax2.set_title("Instrument latent space", fontsize=21)
     ax2.set_xlabel("UMAP 1", fontsize=19)
     ax2.set_ylabel("UMAP 2", fontsize=19)
     ax2.legend(handles=legend_handles, fontsize=15)
