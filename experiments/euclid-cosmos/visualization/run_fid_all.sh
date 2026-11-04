@@ -15,6 +15,6 @@ source /n03data/fontirro/.galaxy-counter-env/bin/activate
 ROOT="/n03data/fontirro/euclid-cosmos/plots_model/euclid-cosmos-nir-h-f150w/test-1-phase1"
 OUT_DIR="${ROOT}/fid_all"
 
-python /n03data/fontirro/euclid-cosmos/galaxy-counter/experiments/euclid-cosmos/visualization/fid_all.py \
+python /n03data/fontirro/euclid-cosmos/galaxy-counter/experiments/euclid-cosmos/visualization/fid_all_plot.py \
     --root    "${ROOT}" \
     --out-dir "${OUT_DIR}"
