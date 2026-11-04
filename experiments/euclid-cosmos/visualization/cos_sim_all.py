@@ -77,7 +77,7 @@ def plot_all(results, encoder, rep, centering, path):
     for lam, _, values in results:
         ax.hist(values, bins=bins, histtype="step", color=color_of[lam], linewidth=2)
     ax.set_xlabel("Cosine similarity values")
-    ax.set_ylabel("Number of pairs")
+    ax.set_ylabel("Number of galaxy pairs")
     #ax.set_title(f"Known pairs, test split · encoder {encoder} ({rep} · {centering})",
     #             fontsize=12)
     # hist() legend entries are filled patches; lines match the step outlines
