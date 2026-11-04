@@ -100,7 +100,7 @@ def plot_all(df, path):
         ax.set_ylabel("Galaxies")
         ax.set_title(f"{SURVEYS[survey]} (N = {sub.groupby('lambda_geo').size().max()} per version)",
                      fontsize=11)
-        ax.legend(handles=handles, title="Geometric weight", fontsize=8, loc="upper right")
+        ax.legend(handles=handles, title="Geometric weight", fontsize=8, loc="upper left")
         ax.spines[["top", "right"]].set_visible(False)
 
     fig.tight_layout()

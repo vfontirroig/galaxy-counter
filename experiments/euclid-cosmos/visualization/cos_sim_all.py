@@ -28,12 +28,15 @@ from matplotlib.lines import Line2D
 
 from cosine_similarity import ENCODERS, REPS, CENTERINGS, analyse, load_splits
 
-# cosine_similarity sets gray axes on import; this plot keeps them black
+# cosine_similarity sets gray axes, a grid and frameless legends on import; this
+# plot keeps matplotlib's black axes, no grid and a framed legend, as mse_all_plot.py
 plt.rcParams.update({
     "axes.edgecolor": "black",
     "axes.labelcolor": "black",
     "xtick.color": "black",
     "ytick.color": "black",
+    "axes.grid": False,
+    "legend.frameon": True,
 })
 
 #CONFIG
@@ -80,9 +83,9 @@ def plot_all(results, encoder, rep, centering, path):
     # hist() legend entries are filled patches; lines match the step outlines
     handles = [Line2D([], [], color=color_of[lam], linewidth=2,
                       # + 0.0 turns a rounded -0.00 into 0.00
-                      label=f"λ = {lam:g} (mean: {round(values.mean(), 2) + 0.0:.2f})")
-               for lam, _, values in results]
-    ax.legend(handles=handles, title="Geometric weight", fontsize=9, loc="upper left")
+                      label=f"λ = {lam:g} {version} (mean: {round(values.mean(), 2) + 0.0:.2f})")
+               for lam, version, values in results]
+    ax.legend(handles=handles, title="Geometric weight", fontsize=8, loc="upper left")
 
     fig.tight_layout()
     fig.savefig(path, dpi=150, bbox_inches="tight")
