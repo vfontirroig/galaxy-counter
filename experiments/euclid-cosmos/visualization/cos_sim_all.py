@@ -1,6 +1,6 @@
 """
 Histogram of the Euclid-vs-COSMOS cosine similarity of known pairs, for every
-lambda_geo in [0, 1] with step 0.1 (one trained version per value).
+lambda_geo in [0, 1] with step 0.1, plus 0.05 (one trained version per value).
 
 For each version it reads the embeddings written by export_embeddings.py
 (<ckpt-root>/<version>/embeddings/embeddings.npz) and that version's own test
@@ -38,17 +38,18 @@ plt.rcParams.update({
 
 #CONFIG
 
-VERSIONS = ['v14','v5','v6','v4','v7','v8','v9','v10','v11','v12','v13']
-LAMBDA_GEO = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+VERSIONS = ['v14','v5','v6','v4','v7','v8','v9','v10','v11','v12','v13','v15']
+LAMBDA_GEO = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 0.05]
 
 # One colour per lambda_geo, in LAMBDA_GEO order. Chosen by search so that every
 # pair stays distinguishable (OKLab Delta E >= 12, target 8) under normal vision
 # and simulated protan/deutan/tritan colour blindness (Machado et al. 2009), as
 # overlaid lines require. All clear 2:1 contrast on white so no line is faint.
 # The order puts the most different colours on neighbouring lambdas, whose
-# distributions overlap most (neighbours Delta E >= 24).
+# distributions overlap most (neighbours Delta E >= 24). The 12th (v15) was found
+# by the same search and is the one fid_all_plot.py uses.
 LAMBDA_COLORS = ["#37cda0", "#2956c4", "#a94620", "#6880f8", "#463d7a", "#d76821",
-                 "#c1aaff", "#7c5d7b", "#ee9e10", "#7b2431", "#a1809f"]
+                 "#c1aaff", "#7c5d7b", "#ee9e10", "#7b2431", "#a1809f", "#4b0339"]
 
 
 def matched_cosine(version_dir, encoder, rep, centering, seed):
@@ -79,7 +80,7 @@ def plot_all(results, encoder, rep, centering, path):
     # hist() legend entries are filled patches; lines match the step outlines
     handles = [Line2D([], [], color=color_of[lam], linewidth=2,
                       # + 0.0 turns a rounded -0.00 into 0.00
-                      label=f"λ = {lam:.1f} (mean: {round(values.mean(), 2) + 0.0:.2f})")
+                      label=f"λ = {lam:g} (mean: {round(values.mean(), 2) + 0.0:.2f})")
                for lam, _, values in results]
     ax.legend(handles=handles, title="Geometric weight", fontsize=9, loc="upper left")
 
@@ -114,7 +115,7 @@ def main():
         rows.append({"version": version, "lambda_geo": lam, "n_test": len(values),
                      "mean": values.mean(), "median": np.median(values),
                      "std": values.std()})
-        print(f"  {version:>3} | lambda_geo {lam:.1f} | {len(values)} pairs | "
+        print(f"  {version:>3} | lambda_geo {lam:<4g} | {len(values)} pairs | "
               f"mean {values.mean():+.3f}  median {np.median(values):+.3f}")
 
     if not results:
