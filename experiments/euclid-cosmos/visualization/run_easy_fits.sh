@@ -9,7 +9,7 @@
 #SBATCH --partition=pscompl
 set -euo pipefail
 
-SCRIPT=/n03data/fontirro/galaxy-counter/experiments/euclid-cosmos/visualization/easy_fits.py
+SCRIPT=/n03data/fontirro/galaxy-counter/experiments/euclid-cosmos/visualization/easy_fits_gal_pairs.py
 TOTAL=311107
 CHUNK=1000
 

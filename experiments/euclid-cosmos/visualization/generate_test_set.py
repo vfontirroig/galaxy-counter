@@ -3,7 +3,7 @@ Generate cutouts for every galaxy of the Euclid x COSMOS test set and save each
 one as a FITS file, so metrics such as FID can be computed later without
 sampling again.
 
-The test set is loaded bidirectionally, as in training and cutout_metrics.py:
+The test set is loaded bidirectionally, as in training and cutout_metrics_gpu.py:
 even h5 rows have a Euclid target (COSMOS input), odd rows a COSMOS target
 (Euclid input). Each galaxy is conditioned as in training: the same galaxy in
 the other survey + its precomputed same-instrument sky neighbour

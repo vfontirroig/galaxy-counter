@@ -1,10 +1,15 @@
 """
 Per-galaxy MSE and pixel Fréchet distance of the mean generation over the
-Euclid x COSMOS test set.
+Euclid x COSMOS test set, from cutouts already generated and saved as FITS
+files by generate_test_set.py.
 
-For every test galaxy, generates --n-samples cutouts from its input (the
-same-galaxy image in the other survey + the same-instrument neighbour), averages
-them, and compares that mean with the real target (anchor):
+Each generated file is paired with its real target in the h5 by name,
+<input>_<target>_idx_<idx>_n_<k>.fits (see compute_fid.py):
+  cos_euc -> real target euclid_images_upscaled[idx]
+  euc_cos -> real target cosmos_images_downscaled[idx]
+Draws n_1 ... n_<--n-samples> of each galaxy are averaged (with --n-samples 1,
+the single generated cutout is used as it is) and that mean is compared with
+the real target (anchor):
   - MSE            pixel by pixel, mean generation vs target.
   - pixel Fréchet  between the distribution of the target's pixel values and
                    that of the mean generation's, each summarised as a Gaussian
@@ -13,9 +18,11 @@ them, and compares that mean with the real target (anchor):
                    This is the FID formula in one dimension, on raw pixel values
                    instead of Inception features. It ignores where pixels are,
                    so it measures brightness levels and contrast, not structure.
-Both are in the normalised units of the target survey, which differ between
-Euclid and COSMOS, so pooling both directions gives a bimodal histogram. So
-also, each divided by the variance of the target image's pixels:
+Both are in the normalised units of the target survey: the FITS files and the
+h5 hold preprocessed units, so the dataset's (x - mean) / std normalisation is
+applied to both first, as in training. Those units differ between Euclid and
+COSMOS, so pooling both directions gives a bimodal histogram. So also, each
+divided by the variance of the target image's pixels:
   - normalised MSE            MSE / variance = 1 - R^2: the fraction of the
                               target's pixel variance the mean generation
                               leaves unexplained.
@@ -25,8 +32,7 @@ also, each divided by the variance of the target image's pixels:
 Both are unitless and unchanged by each survey's (x - mean) / std
 normalisation, so comparable across surveys.
 
-The test set is loaded bidirectionally, as in training: even h5 rows have a
-Euclid target (COSMOS input), odd rows a COSMOS target (Euclid input).
+Galaxies missing any of the --n-samples draws are skipped, with a warning.
 
 Writes to --out-dir:
   per_galaxy.csv             idx, anchor_survey, mse_mean_vs_target, pixel_frechet,
@@ -35,26 +41,22 @@ Writes to --out-dir:
   histograms_normalised.png  per-galaxy normalised MSE | normalised pixel Fréchet
 
 Usage:
-    python experiments/euclid-cosmos/visualization/cutout_metrics.py \
-        --checkpoint /n03data/fontirro/euclid-cosmos/checkpoints/.../best-epoch=75-step=92000.ckpt \
+    python experiments/euclid-cosmos/visualization/pixel_metrics.py \
         --h5         /n03data/fontirro/data_files/euclid_cosmos_pairs_nir_h_f150w_v2.h5 \
-        --indices    /n03data/fontirro/euclid-cosmos/checkpoints/.../test_indices.npy \
-        --out-dir    /n03data/fontirro/euclid-cosmos/plots_model/.../fid
+        --gen-dir    /n03data/fontirro/cutouts/gen/v15 \
+        --out-dir    /n03data/fontirro/euclid-cosmos/plots_model/.../pixel_metrics \
+        --n-samples  1
 """
 
 import os
 import sys
 import argparse
-from functools import partial
 import numpy as np
 import pandas as pd
 import torch
-import pytorch_lightning as pl
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from torch.utils.data import DataLoader, Subset
-from tqdm import tqdm
 
 _here = os.path.dirname(__file__)
 _experiment_dir = os.path.abspath(os.path.join(_here, ".."))
@@ -62,8 +64,11 @@ _repo_root = os.path.abspath(os.path.join(_here, "..", "..", ".."))
 sys.path.insert(0, _experiment_dir)
 sys.path.insert(0, os.path.join(_repo_root, "src"))
 
-from dataset import EuclidCosmosDataset
-from train import EuclidCosmosModel, collate_fn
+from dataset import NORM_DICT
+from visualization.compute_fid import DIRECTIONS, find_generated, load_real, load_generated
+
+# anchor survey -> NORM_DICT key of its 64 x 64 h5 images
+NORM_KEY = {"euclid": "euclid_up", "cosmos": "cosmos_ds"}
 
 
 def pixel_frechet(target, generated):
@@ -137,84 +142,51 @@ def plot_normalised_histograms(per_galaxy, n_samples, path):
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--checkpoint",  required=True)
     p.add_argument("--h5",          required=True)
-    p.add_argument("--indices",     required=True, help="test_indices.npy saved by train.py")
+    p.add_argument("--gen-dir",     required=True,
+                   help="Folder of FITS files from generate_test_set.py, e.g. /n03data/fontirro/cutouts/gen/v15")
     p.add_argument("--out-dir",     required=True)
-    p.add_argument("--n-samples",   type=int, default=3,
-                   help="Generations per input, averaged into the mean")
-    p.add_argument("--num-steps",   type=int, default=100, help="ODE integration steps")
-    p.add_argument("--batch-size",  type=int, default=64)
-    p.add_argument("--num-workers", type=int, default=4)
-    p.add_argument("--seed",        type=int, default=42,
-                   help="Fixes the neighbour fallbacks and the sampling noise, "
-                        "so reruns reproduce the same metrics")
-    p.add_argument("--precision",   default="bf16-mixed", choices=["bf16-mixed", "32"],
-                   help="Sampling precision. bf16-mixed matches training (train.py's "
-                        "Trainer precision, which also covers its validation sampling) and "
-                        "is several times faster; 32 is full fp32.")
+    p.add_argument("--n-samples",   type=int, default=1,
+                   help="Draws per galaxy (_n_1 ... _n_<N>), averaged into the mean")
     args = p.parse_args()
-    pl.seed_everything(args.seed, workers=True)
-    torch.backends.cuda.matmul.allow_tf32 = True
-    torch.backends.cudnn.allow_tf32 = True
-
-    # Created up front: everything is written after the full generation pass.
     os.makedirs(args.out_dir, exist_ok=True)
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Device: {device}")
+    # --- Generated files, one {prefix: {h5 idx: path}} per draw ---
+    found = [find_generated(args.gen_dir, k) for k in range(1, args.n_samples + 1)]
 
-    # --- Load model ---
-    print(f"Loading checkpoint: {args.checkpoint}")
-    model = EuclidCosmosModel.load_from_checkpoint(args.checkpoint, map_location=device)
-    model.eval()
-    model.to(device)
-
-    # --- Test set, both directions as in training ---
-    test_indices = np.load(args.indices)
-    dataset = EuclidCosmosDataset(args.h5, bidirectional=True)
-    loader = DataLoader(
-        Subset(dataset, test_indices.tolist()),
-        batch_size=args.batch_size,
-        shuffle=False,
-        num_workers=args.num_workers,
-        collate_fn=partial(collate_fn, dataset=dataset),
-    )
-    print(f"Test set: {len(test_indices)} galaxies")
-
-    # --- Generate: one draw per input ---
     rows = []
-    autocast = torch.autocast(device_type=device.type, dtype=torch.bfloat16,
-                              enabled=args.precision == "bf16-mixed")
-    with torch.no_grad(), autocast:
-        for anchor, cond, sameins, masks, metadata in tqdm(loader, desc="Generating"):
-            anchor  = anchor.to(device)
-            cond    = cond.to(device)
-            sameins = sameins.to(device)
-            masks   = masks.to(device)
+    for prefix, (survey, key) in DIRECTIONS.items():
+        # Only galaxies with every draw on disk, so each mean is over n_samples draws
+        with_any = set().union(*(f[prefix] for f in found))
+        idx = np.array(sorted(set(found[0][prefix]).intersection(*(f[prefix] for f in found[1:]))))
+        if len(with_any) > len(idx):
+            print(f"[WARN] {prefix}: {len(with_any) - len(idx)} galaxies lack some of draws "
+                  f"1..{args.n_samples}, skipped")
+        if len(idx) == 0:
+            print(f"[WARN] {prefix}: no galaxies with all {args.n_samples} draws in {args.gen_dir}")
+            continue
+        print(f"{prefix}: {len(idx)} galaxies")
 
-            # Same conditioning for every draw, so they differ only by the
-            # sampling noise.
-            draws = torch.stack([
-                model.sample(
-                    cond_image_samegal=cond,
-                    cond_image_sameins=sameins,
-                    masks=masks,
-                    num_steps=args.num_steps,
-                )
-                for _ in range(args.n_samples)
-            ]).float()  # (n_samples, B, 1, H, W); metrics in fp32 whatever the precision
-            mean_generation = draws.mean(dim=0)
+        # Both sets in the target survey's normalised units, as in training
+        mean, std = NORM_DICT[NORM_KEY[survey]]
+        anchor = (load_real(args.h5, key, idx) - mean) / std
+        draws = torch.stack([load_generated([f[prefix][i] for i in idx]) for f in found])
+        mean_generation = (draws.mean(dim=0) - mean) / std  # (N, 1, H, W)
+        if mean_generation.shape != anchor.shape:
+            raise ValueError(f"{prefix}: real {tuple(anchor.shape)} vs generated {tuple(mean_generation.shape)}")
 
-            mse = ((mean_generation - anchor) ** 2).mean(dim=(1, 2, 3)).cpu()
-            fd  = pixel_frechet(anchor, mean_generation).cpu()
-            var_t = target_variance(anchor).cpu()
-            for i, m in enumerate(metadata):
-                rows.append({"idx": m["idx"], "anchor_survey": m["anchor_survey"],
-                             "mse_mean_vs_target": mse[i].item(),
-                             "pixel_frechet": fd[i].item(),
-                             "nmse_mean_vs_target": (mse[i] / var_t[i]).item(),
-                             "npixel_frechet": (fd[i] / var_t[i]).item()})
+        mse = ((mean_generation - anchor) ** 2).mean(dim=(1, 2, 3))
+        fd  = pixel_frechet(anchor, mean_generation)
+        var_t = target_variance(anchor)
+        for i, galaxy in enumerate(idx):
+            rows.append({"idx": int(galaxy), "anchor_survey": survey,
+                         "mse_mean_vs_target": mse[i].item(),
+                         "pixel_frechet": fd[i].item(),
+                         "nmse_mean_vs_target": (mse[i] / var_t[i]).item(),
+                         "npixel_frechet": (fd[i] / var_t[i]).item()})
+
+    if not rows:
+        raise SystemExit(f"No generated FITS files with all {args.n_samples} draws in {args.gen_dir}")
 
     per_galaxy = pd.DataFrame(rows)
     # %.6g (significant digits), not %.6f: pixel_frechet goes down to ~1e-5.
